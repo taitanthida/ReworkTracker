@@ -1,0 +1,550 @@
+"use client"
+import { useState, useRef, useEffect, type CSSProperties, type ReactNode } from "react";
+import { ArrowLeft, ClipboardList, BadgeAlert, UserRoundCog, PackageSearch, XCircle, ChevronDown, ChevronRight, Download } from "lucide-react";
+import { useRouter } from "next/navigation"
+import { fetchAllLabels, formatDateFromISO, fetchDefectCodes, type ApiLabel, type DefectCode } from "../../lib/api"
+
+// ── Types ─────────────────────────────────────────────────────────────────────
+
+type Status = ApiLabel["status"]
+
+type OrderGroup = {
+  orderId:      string;
+  materialId:   string | null | undefined;
+  description:  string | null | undefined;
+  latestRound:  number;
+  latestStatus: Status;
+  latestDate:   string;
+  labels:       ApiLabel[];
+}
+
+type ReworkLogRow = {
+  date:        string;
+  order:       string;
+  description: string | null | undefined;
+  linePost:    string | null | undefined;
+  progPlan:    string | null | undefined;
+  qcAfterP:    string | null | undefined;
+  total:       number | null | undefined;
+  good:        number;
+  bad:         number;
+  rw:          (number | null)[];
+}
+
+type GroupColKey = "orderId" | "materialId" | "description" | "latestStatus" | "latestDate";
+type GroupFilters = Partial<Record<GroupColKey, Set<string>>>;
+
+// ── Constants ─────────────────────────────────────────────────────────────────
+
+const STATUS_CHIP: Record<Status, { label: string; bg: string; color: string }> = {
+  ISSUED:      { label: "Issued",      bg: "#FEE2E2", color: "#991B1B" },
+  IN_PROGRESS: { label: "In Progress", bg: "#FEF3C7", color: "#92400E" },
+  RETURNED:    { label: "Returned",    bg: "#DCFCE7", color: "#166534" },
+  CLOSED:      { label: "Closed",      bg: "#EDE9FE", color: "#4C1D95" },
+};
+
+const TH_BASE: CSSProperties = {
+  fontSize: 10, fontWeight: 600, color: "#999",
+  textTransform: "uppercase", letterSpacing: "0.07em", whiteSpace: "nowrap",
+};
+
+const GROUP_COLS: { key: GroupColKey; label: string; width: string }[] = [
+  { key: "orderId",      label: "ORDER",          width: "120px" },
+  { key: "materialId",   label: "MATERIAL ID",    width: "120px" },
+  { key: "description",  label: "DESCRIPTION",    width: "1fr"   },
+  { key: "latestStatus", label: "ROUND / STATUS", width: "160px" },
+  { key: "latestDate",   label: "LAST UPDATED",   width: "160px" },
+];
+
+const TABLE_GRID = `32px ${GROUP_COLS.map(c => c.width).join(" ")}`;
+
+const LOG_HEADERS: { label: string; center: boolean; color?: string; bg?: string }[] = [
+  { label: "DATE",        center: false },
+  { label: "ORDER",       center: false },
+  { label: "DESCRIPTION", center: false },
+  { label: "LINE POST",   center: true  },
+  { label: "PROG PLAN",   center: true  },
+  { label: "QC AFTER P",  center: true  },
+  { label: "TOTAL",       center: true  },
+  { label: "งานดี",        center: true, color: "#166534", bg: "#DCFCE7" },
+  { label: "งานเสีย",      center: true, color: "#991B1B", bg: "#FEE2E2" },
+  { label: "R1", center: true, color: "#4C1D95", bg: "#EDE9FE" },
+  { label: "R2", center: true, color: "#4C1D95", bg: "#EDE9FE" },
+  { label: "R3", center: true, color: "#4C1D95", bg: "#EDE9FE" },
+  { label: "R4", center: true, color: "#4C1D95", bg: "#EDE9FE" },
+  { label: "R5", center: true, color: "#4C1D95", bg: "#EDE9FE" },
+  { label: "R6", center: true, color: "#4C1D95", bg: "#EDE9FE" },
+];
+
+const LOG_COLS = "90px 120px 1fr 90px 90px 90px 90px 90px 90px 40px 40px 40px 40px 40px 40px";
+
+// ── Data helpers ──────────────────────────────────────────────────────────────
+
+// Group all labels by orderId, sorted by round ascending
+function buildOrderGroups(labels: ApiLabel[]): OrderGroup[] {
+  const map = new Map<string, ApiLabel[]>();
+  for (const r of labels) {
+    if (!map.has(r.order_id)) map.set(r.order_id, []);
+    map.get(r.order_id)!.push(r);
+  }
+  return Array.from(map.values()).map(group => {
+    group.sort((a, b) => a.round_no - b.round_no);
+    const latest = group[group.length - 1];
+    return {
+      orderId:      latest.order_id,
+      materialId:   latest.material_id,
+      description:  latest.description,
+      latestRound:  latest.round_no,
+      latestStatus: latest.status,
+      latestDate:   formatDateFromISO(latest.issued_at),
+      labels:       group,
+    };
+  });
+}
+
+// Build rework log: 1 row per order, with first-pass good/bad and per-round results
+function buildReworkLog(labels: ApiLabel[]): ReworkLogRow[] {
+  const map = new Map<string, ApiLabel[]>();
+  for (const r of labels) {
+    if (!map.has(r.order_id)) map.set(r.order_id, []);
+    map.get(r.order_id)!.push(r);
+  }
+  return Array.from(map.values()).map(group => {
+    group.sort((a, b) => a.round_no - b.round_no);
+    const first  = group[0];
+    const latest = group[group.length - 1];
+    const round1 = group.find(l => l.round_no === 1)!;
+
+    // good = total qty minus what was sent to rework in round 1
+    const firstPassGood = (latest.total ?? 0) - round1.input_qty;
+
+    // rw[n-1] = result_good_qty of round n (null if not closed yet)
+    const rw: (number | null)[] = Array(6).fill(null);
+    group.forEach(l => { if (l.round_no >= 1 && l.round_no <= 6) rw[l.round_no - 1] = l.result_good_qty; });
+
+    return {
+      date:        formatDateFromISO(first.issued_at),
+      order:       first.order_id,
+      description: first.description,
+      linePost:    latest.line_post,
+      progPlan:    latest.prog_plan,
+      qcAfterP:    latest.qc_after_p,
+      total:       latest.total,
+      good:        firstPassGood,
+      bad:         round1.input_qty,
+      rw,
+    };
+  });
+}
+
+// ── Sub-components ────────────────────────────────────────────────────────────
+
+const ExportBtn = () => (
+  <button style={{ display: "flex", alignItems: "center", gap: 6, height: 32, padding: "0 14px", background: "#fff", border: "0.5px solid #E5E7EB", borderRadius: 8, fontSize: 12, fontWeight: 500, color: "#374151", cursor: "pointer", fontFamily: "Inter, sans-serif" }}>
+    <Download size={13} color="#000000" /> Export
+  </button>
+);
+
+function CardField({ label, value, color }: { label: string; value: string; color?: string }) {
+  return (
+    <div>
+      <p style={{ fontSize: 10, color: "#8C8985", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 2 }}>{label}</p>
+      <p style={{ fontSize: 12, fontWeight: 500, color: color ?? "#000000" }}>{value}</p>
+    </div>
+  );
+}
+
+function MetricCard({ icon, iconBg, iconBorder, label, value, valueCss, cardCss, labelCss }: {
+  icon: ReactNode; iconBg: string; iconBorder: string;
+  label: string; value: number;
+  valueCss: CSSProperties; cardCss: { background: string; borderColor: string };
+  labelCss: CSSProperties;
+}) {
+  return (
+    <div style={{ background: cardCss.background, border: `0.5px solid ${cardCss.borderColor}`, borderRadius: 12, padding: "16px 20px", display: "flex", alignItems: "center", gap: 14 }}>
+      <div style={{ width: 40, height: 40, borderRadius: 10, background: iconBg, border: `0.5px solid ${iconBorder}`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{icon}</div>
+      <div>
+        <p style={{ fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4, ...labelCss }}>{label}</p>
+        <p style={{ fontSize: 30, fontWeight: 700, lineHeight: 1, ...valueCss }}>{value}</p>
+      </div>
+    </div>
+  );
+}
+
+function CheckRow({ label, checked, onChange }: { label: string; checked: boolean; onChange: () => void }) {
+  return (
+    <label
+      style={{ display: "flex", alignItems: "center", gap: 8, padding: "5px 8px", borderRadius: 5, cursor: "pointer", fontSize: 12, color: "#000000", fontFamily: "Inter, sans-serif" }}
+      onMouseEnter={e => (e.currentTarget.style.background = "#F0EEE4")}
+      onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
+    >
+      <input type="checkbox" checked={checked} onChange={onChange} style={{ accentColor: "#8DBAED", width: 13, height: 13, cursor: "pointer" }} />
+      {label}
+    </label>
+  );
+}
+
+function LogCell({ children, center, muted, green, red }: {
+  children: ReactNode; center?: boolean; muted?: boolean; green?: boolean; red?: boolean;
+}) {
+  return (
+    <div style={{
+      fontSize: 12,
+      color: red ? "#DC2626" : green ? "#16A34A" : "#000000",
+      fontWeight: 400,
+      padding: "0 8px",
+      textAlign: center ? "center" : "left",
+      overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+    }}>
+      {children}
+    </div>
+  );
+}
+
+// ── Main component ────────────────────────────────────────────────────────────
+
+export function ReworkDashboard() {
+
+  // ── Data state ──────────────────────────────────────────────────────────────
+  const [labels,  setLabels]  = useState<ApiLabel[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchAllLabels()
+      .then(data => { setLabels(data); setLoading(false); })
+      .catch(() => setLoading(false));
+  }, []);
+
+  // Derived data — recomputed when labels change
+  const orderGroups     = buildOrderGroups(labels);
+  const reworkLog       = buildReworkLog(labels);
+  const issuedCount     = labels.filter(r => r.status === "ISSUED").length;
+  const inProgressCount = labels.filter(r => r.status === "IN_PROGRESS").length;
+  const returnedCount   = labels.filter(r => r.status === "RETURNED").length;
+  const closedCount     = labels.filter(r => r.status === "CLOSED").length;
+
+  // ── UI state ────────────────────────────────────────────────────────────────
+  const [expandedOrders, setExpandedOrders] = useState<Set<string>>(new Set());
+  const [expandedLabels, setExpandedLabels] = useState<Set<string>>(new Set());
+  const [openCol,        setOpenCol]        = useState<GroupColKey | null>(null);
+  const [filters,        setFilters]        = useState<GroupFilters>({});
+  const [draft,          setDraft]          = useState<Set<string>>(new Set());
+  const [colSearch,      setColSearch]      = useState("");
+  const [showLog,        setShowLog]        = useState(false);
+  const tableRef = useRef<HTMLDivElement>(null);
+  const router   = useRouter();
+  const [defectOptions, setDefectOptions] = useState<DefectCode[]>([]);
+
+
+  // Close filter dropdown on outside click
+  useEffect(() => {
+    function handler(e: MouseEvent) {
+      if (tableRef.current && !tableRef.current.contains(e.target as Node)) setOpenCol(null);
+    }
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  useEffect(() => {
+  fetchDefectCodes().then(setDefectOptions).catch(console.error);
+  }, []);
+
+  // ── Expand/collapse handlers ─────────────────────────────────────────────────
+
+  function toggleOrder(orderId: string) {
+    setExpandedOrders(prev => { const n = new Set(prev); n.has(orderId) ? n.delete(orderId) : n.add(orderId); return n; });
+  }
+
+  function toggleLabel(labelId: string) {
+    setExpandedLabels(prev => { const n = new Set(prev); n.has(labelId) ? n.delete(labelId) : n.add(labelId); return n; });
+  }
+
+  // ── Filter helpers ───────────────────────────────────────────────────────────
+
+  function groupUniqueValues(col: GroupColKey): string[] {
+    return Array.from(new Set(orderGroups.map(r => String(r[col] ?? "")).filter(Boolean))).sort();
+  }
+
+  function openFilter(col: GroupColKey) {
+    if (openCol === col) { setOpenCol(null); return; }
+    setDraft(filters[col] ? new Set(filters[col]) : new Set(groupUniqueValues(col)));
+    setColSearch(""); setOpenCol(col);
+  }
+
+  function applyFilter() {
+    const vals  = groupUniqueValues(openCol!);
+    const isAll = vals.every(v => draft.has(v));
+    setFilters(prev => { const n = { ...prev }; if (isAll) delete n[openCol!]; else n[openCol!] = new Set(draft); return n; });
+    setOpenCol(null);
+  }
+
+  function clearFilter() {
+    setFilters(prev => { const n = { ...prev }; delete n[openCol!]; return n; });
+    setOpenCol(null);
+  }
+
+  function toggleDraft(val: string) {
+    setDraft(prev => { const n = new Set(prev); n.has(val) ? n.delete(val) : n.add(val); return n; });
+  }
+
+  function toggleAll() {
+    const vals = groupUniqueValues(openCol!);
+    setDraft(vals.every(v => draft.has(v)) ? new Set() : new Set(vals));
+  }
+
+  function clearAllFilters() {
+    setFilters({});
+    setExpandedOrders(new Set());
+    setExpandedLabels(new Set());
+  }
+
+  // ── Derived filter state ─────────────────────────────────────────────────────
+
+  const filteredGroups = orderGroups.filter(row =>
+    (Object.entries(filters) as [GroupColKey, Set<string>][]).every(([col, allowed]) => allowed.has(String(row[col] ?? "")))
+  );
+
+  const isFilterActive = (col: GroupColKey) => !!filters[col];
+  const hasFilters     = Object.keys(filters).length > 0;
+
+  // ── Render ───────────────────────────────────────────────────────────────────
+
+  return (
+    <div style={{ width: "100%", minHeight: "100vh", background: "#F0EEE4", fontFamily: "Inter, sans-serif" }}>
+
+      {/* App bar */}
+      <div style={{ height: 56, background: "#fff", borderBottom: "0.5px solid #E5E7EB", display: "flex", alignItems: "center", padding: "0 32px", gap: 12 }}>
+        <button onClick={() => router.push("/")} style={{ width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center", background: "none", border: "none", cursor: "pointer", borderRadius: 8, color: "#8C8985" }}>
+          <ArrowLeft size={18} />
+        </button>
+        <span style={{ fontSize: 14, fontWeight: 700, color: "#000000" }}>Dashboard</span>
+      </div>
+
+      <div style={{ maxWidth: 1536, margin: "0 auto", padding: "32px 32px 60px" }}>
+
+        {/* ── Metric cards ── */}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr 1fr", gap: 14, marginBottom: 28 }}>
+          <MetricCard icon={<ClipboardList size={16} color="#6B7280" />} iconBg="#F9FAFB" iconBorder="#E5E7EB" label="Total Labels"  value={labels.length}   valueCss={{ color: "#111827" }} cardCss={{ background: "#fff",     borderColor: "#E5E7EB" }} labelCss={{ color: "#9CA3AF" }} />
+          <MetricCard icon={<BadgeAlert    size={16} color="#991B1B" />} iconBg="#FEE2E2" iconBorder="#FECACA" label="Issued"        value={issuedCount}     valueCss={{ color: "#991B1B" }} cardCss={{ background: "#FEF2F2", borderColor: "#FECACA" }} labelCss={{ color: "#991B1B" }} />
+          <MetricCard icon={<UserRoundCog  size={16} color="#92400E" />} iconBg="#FEF3C7" iconBorder="#FDE68A" label="In Progress"   value={inProgressCount} valueCss={{ color: "#92400E" }} cardCss={{ background: "#FFFBEB", borderColor: "#FDE68A" }} labelCss={{ color: "#92400E" }} />
+          <MetricCard icon={<PackageSearch size={16} color="#166534" />} iconBg="#DCFCE7" iconBorder="#BBF7D0" label="Returned"      value={returnedCount}   valueCss={{ color: "#166534" }} cardCss={{ background: "#F0FDF4", borderColor: "#BBF7D0" }} labelCss={{ color: "#166534" }} />
+          <MetricCard icon={<XCircle       size={16} color="#4C1D95" />} iconBg="#EDE9FE" iconBorder="#DDD6FE" label="Closed"        value={closedCount}     valueCss={{ color: "#4C1D95" }} cardCss={{ background: "#F5F3FF", borderColor: "#DDD6FE" }} labelCss={{ color: "#6D28D9" }} />
+        </div>
+
+        {/* ── All rework orders table ── */}
+        <div ref={tableRef} style={{ background: "#fff", border: "0.5px solid #E5E7EB", borderRadius: 12, overflow: "visible", position: "relative", marginBottom: 16 }}>
+
+          {/* Table top bar */}
+          <div style={{ padding: "14px 20px 12px", borderBottom: "0.5px solid #E5E7EB", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <span style={{ fontSize: 13, fontWeight: 600, color: "#8C8985" }}>All rework orders</span>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              {hasFilters && (
+                <button onClick={clearAllFilters} style={{ fontSize: 12, color: "#8C8985", background: "none", border: "0.5px solid #E5E7EB", borderRadius: 6, padding: "2px 10px", cursor: "pointer", fontFamily: "Inter, sans-serif" }}>Clear filters</button>
+              )}
+              {(expandedOrders.size > 0 || expandedLabels.size > 0) && (
+                <button onClick={() => { setExpandedOrders(new Set()); setExpandedLabels(new Set()); }} style={{ fontSize: 12, color: "#8C8985", background: "none", border: "0.5px solid #E5E7EB", borderRadius: 6, padding: "2px 10px", cursor: "pointer", fontFamily: "Inter, sans-serif" }}>Collapse all</button>
+              )}
+            </div>
+          </div>
+
+          {/* Column headers with filter dropdowns */}
+          <div style={{ display: "grid", gridTemplateColumns: TABLE_GRID, background: "#ADCFF1", borderBottom: "1px solid #8DBAED" }}>
+            <div style={{ height: 36 }} />
+            {GROUP_COLS.map(col => {
+              const active = isFilterActive(col.key);
+              const isOpen = openCol === col.key;
+              return (
+                <div key={col.key} style={{ position: "relative" }}>
+                  <button onClick={() => openFilter(col.key)} style={{ width: "100%", height: 36, display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 12px", gap: 4, background: isOpen ? "#E5E7EB" : "transparent", border: "none", cursor: "pointer", fontFamily: "Inter, sans-serif", borderRight: "0.5px solid #E5E7EB" }}>
+                    <span style={{ ...TH_BASE, color: active ? "#fff" : "#000000" }}>{col.label}</span>
+                    <ChevronDown size={12} color={active || isOpen ? "#fff" : "#000000"} style={{ flexShrink: 0 }} />
+                  </button>
+                  {isOpen && (
+                    <div style={{ position: "absolute", top: "calc(100% + 4px)", left: 0, zIndex: 100, background: "#fff", border: "1px solid #E5E7EB", borderRadius: 8, minWidth: 200, boxShadow: "0 4px 12px rgba(0,0,0,0.08)", overflow: "hidden" }}>
+                      <div style={{ padding: "10px 12px 8px" }}>
+                        <input value={colSearch} onChange={e => setColSearch(e.target.value)} placeholder="Search..." style={{ width: "100%", height: 30, padding: "0 10px", fontSize: 12, color: "#000000", background: "#F9FAFB", border: "0.5px solid #E5E7EB", borderRadius: 6, outline: "none", boxSizing: "border-box", fontFamily: "Inter, sans-serif" }} />
+                      </div>
+                      <div style={{ padding: "0 4px 4px", maxHeight: 200, overflowY: "auto" }}>
+                        <CheckRow label="All" checked={groupUniqueValues(col.key).every(v => draft.has(v))} onChange={toggleAll} />
+                        {groupUniqueValues(col.key).filter(v => v.toLowerCase().includes(colSearch.toLowerCase())).map(val => (
+                          <CheckRow key={val} label={val} checked={draft.has(val)} onChange={() => toggleDraft(val)} />
+                        ))}
+                      </div>
+                      <div style={{ padding: "8px 12px 10px", borderTop: "0.5px solid #E5E7EB", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                        <button onClick={clearFilter} style={{ height: 28, padding: "0 10px", borderRadius: 6, fontSize: 12, color: "#8C8985", cursor: "pointer", fontFamily: "Inter, sans-serif" }}>Clear</button>
+                        <button onClick={applyFilter} style={{ height: 28, padding: "0 14px", background: "#8DBAED", color: "#fff", borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "Inter, sans-serif" }}>Apply</button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Table rows */}
+          {loading ? (
+            <div style={{ padding: "24px 20px", fontSize: 13, color: "#9CA3AF", textAlign: "center" }}>Loading...</div>
+          ) : filteredGroups.length === 0 ? (
+            <div style={{ padding: "24px 20px", fontSize: 13, color: "#9CA3AF", textAlign: "center" }}>No orders match the current filters</div>
+          ) : filteredGroups.map((group, gi) => {
+            const isExpanded = expandedOrders.has(group.orderId);
+            return (
+              <div key={group.orderId}>
+
+                {/* Level 1: Order row */}
+                <div
+                  onClick={() => toggleOrder(group.orderId)}
+                  style={{ display: "grid", gridTemplateColumns: TABLE_GRID, minHeight: 48, alignItems: "center", cursor: "pointer", borderBottom: (!isExpanded && gi < filteredGroups.length - 1) ? "1px solid #E5E7EB" : "none", background: isExpanded ? "#E5E7EB" : "#fff", borderLeft: `3px solid ${isExpanded ? "#8DBAED" : "transparent"}` }}
+                  onMouseEnter={e => { if (!isExpanded) e.currentTarget.style.background = "#F9FAFB"; }}
+                  onMouseLeave={e => { e.currentTarget.style.background = isExpanded ? "#E5E7EB" : "#fff"; }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    {isExpanded ? <ChevronDown size={14} color="#8DBAED" /> : <ChevronRight size={14} color="#8DBAED" />}
+                  </div>
+                  <div style={{ fontSize: 13, color: "#000000", padding: "0 12px", fontWeight: 500 }}>{group.orderId}</div>
+                  <div style={{ fontSize: 13, color: "#000000", padding: "0 12px" }}>{group.materialId ?? "–"}</div>
+                  <div style={{ fontSize: 13, color: "#000000", padding: "0 12px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{group.description ?? "–"}</div>
+                  <div style={{ padding: "0 12px" }}>
+                    <span style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "3px 10px", borderRadius: 999, fontSize: 11, fontWeight: 500, background: STATUS_CHIP[group.latestStatus].bg, color: STATUS_CHIP[group.latestStatus].color }}>
+                      <span style={{ opacity: 0.7 }}>R{group.latestRound}</span>
+                      <span style={{ opacity: 0.4 }}>·</span>
+                      {STATUS_CHIP[group.latestStatus].label}
+                    </span>
+                  </div>
+                  <div style={{ fontSize: 13, color: "#000000", padding: "0 12px" }}>{group.latestDate}</div>
+                </div>
+
+                {/* Level 2: Round rows */}
+                {isExpanded && (
+                  <div style={{ background: "#fff", borderBottom: gi < filteredGroups.length - 1 ? "1px solid #E5E7EB" : "none" }}>
+                    {group.labels.map((lbl, li) => {
+                      const isDetailOpen = expandedLabels.has(lbl.label_id);
+                      return (
+                        <div key={lbl.label_id}>
+
+                          {/* Round compact row */}
+                          <div
+                            onClick={() => toggleLabel(lbl.label_id)}
+                            style={{ display: "grid", gridTemplateColumns: "52px 180px 160px 1fr 110px", minHeight: 40, alignItems: "center", cursor: "pointer", borderBottom: (!isDetailOpen && li < group.labels.length - 1) ? "1px solid #E5E7EB" : "none", background: isDetailOpen ? "#fff" : "transparent", paddingLeft: 20 }}
+                            onMouseEnter={e => { if (!isDetailOpen) e.currentTarget.style.background = "#F9FAFB"; }}
+                            onMouseLeave={e => { e.currentTarget.style.background = isDetailOpen ? "#fff" : "transparent"; }}
+                          >
+                            <div style={{ display: "flex", alignItems: "center", justifyContent: "center" }}>
+                              {isDetailOpen ? <ChevronDown size={12} color="#8DBAED" /> : <ChevronRight size={12} color="#8DBAED" />}
+                            </div>
+                            <div style={{ fontSize: 12, color: "#000000", fontWeight: 600 }}>{lbl.label_id}</div>
+                            <div>
+                              <span style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "2px 8px", borderRadius: 999, fontSize: 11, fontWeight: 500, background: STATUS_CHIP[lbl.status].bg, color: STATUS_CHIP[lbl.status].color }}>
+                                R{lbl.round_no} · {STATUS_CHIP[lbl.status].label}
+                              </span>
+                            </div>
+                            <div style={{ fontSize: 12, color: "#9CA3AF" }}>
+                              Issued {formatDateFromISO(lbl.issued_at)}{lbl.closed_at ? ` → Closed ${formatDateFromISO(lbl.closed_at)}` : ""}
+                            </div>
+                            <div style={{ fontSize: 12, color: "#9CA3AF" }}>{lbl.input_qty} pcs</div>
+                          </div>
+
+                          {/* Level 3: Detail card */}
+                          {isDetailOpen && (
+                            <div style={{ padding: "12px 20px 14px 72px", background: "#fff", borderBottom: li < group.labels.length - 1 ? "1px solid #E5E7EB" : "none" }}>
+                              <div style={{ background: "#F9FAFB", border: `0.5px solid #E5E7EB`, borderLeft: `3px solid ${STATUS_CHIP[lbl.status].color}`, borderRadius: 8, padding: "12px 16px" }}>
+
+                                {/* Date + qty fields */}
+                                <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "8px 20px", marginBottom: (lbl.defect_codes.length > 0 || lbl.remark) ? 12 : 0 }}>
+                                  <CardField label="RW Line"   value={lbl.rw_line} />
+                                  <CardField label="Returned"  value={formatDateFromISO(lbl.returned_at) || "–"} />
+                                  <CardField label="Issued"    value={formatDateFromISO(lbl.issued_at)   || "–"} />
+                                  <CardField label="Received"  value={formatDateFromISO(lbl.received_at) || "–"} />
+                                  <CardField label="Input Qty" value={String(lbl.input_qty)} />
+                                  <CardField label="Good"      value={lbl.result_good_qty !== null ? String(lbl.result_good_qty) : "–"} />
+                                  <CardField label="Bad"       value={lbl.result_bad_qty  !== null ? String(lbl.result_bad_qty)  : "–"} />
+                                  <CardField label="Closed"    value={formatDateFromISO(lbl.closed_at) || "–"} />
+                                </div>
+
+                                {/* Defect codes */}
+                                {lbl.defect_codes.length > 0 && (
+                                  <div style={{ marginBottom: lbl.remark ? 10 : 0 }}>
+                                    <p style={{ fontSize: 10, color: "#8C8985", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 4 }}>Defect Codes</p>
+                                    <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+                                      {lbl.defect_codes.map(code => (
+                                        <span key={code} style={{ padding: "2px 8px", borderRadius: 999, background: "#000000", color: "#fff", fontSize: 11, fontWeight: 500 }}>
+                                          {code}{defectOptions.find(d => d.defect_code === code) ? ` · ${defectOptions.find(d => d.defect_code === code)!.description_th}` : ""}
+                                        </span>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+
+                                {/* Remark */}
+                                {lbl.remark && (
+                                  <div>
+                                    <p style={{ fontSize: 10, color: "#8C8985", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 2 }}>Remark</p>
+                                    <p style={{ fontSize: 12, color: "#000000" }}>{lbl.remark}</p>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        {/* ── Rework Log (toggle) ── */}
+        <div>
+          <button
+            onClick={() => setShowLog(v => !v)}
+            style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 500, color: "#000000", background: "#fff", border: "0.5px solid #E5E7EB", borderRadius: 8, padding: "6px 14px", cursor: "pointer", fontFamily: "Inter, sans-serif", marginBottom: showLog ? 12 : 0 }}
+          >
+            {showLog ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
+            {showLog ? "Hide" : "Show"} Rework Log
+          </button>
+
+          {showLog && (
+            <div style={{ background: "#fff", border: "0.5px solid #E5E7EB", borderRadius: 12, overflow: "hidden" }}>
+              <div style={{ padding: "14px 20px 12px", borderBottom: "0.5px solid #E5E7EB", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                <span style={{ fontSize: 13, fontWeight: 600, color: "#8C8985" }}>Rework Log</span>
+                <ExportBtn />
+              </div>
+              <div style={{ overflowX: "auto" }}>
+
+                {/* Log header */}
+                <div style={{ display: "grid", gridTemplateColumns: LOG_COLS, background: "#F9FAFB", borderBottom: "1px solid #E5E7EB", minHeight: 44, alignItems: "center" }}>
+                  {LOG_HEADERS.map(h => (
+                    <div key={h.label} style={{ ...TH_BASE, padding: "0 8px", textAlign: h.center ? "center" : "left", color: h.color ?? "#000000", background: h.bg ?? "transparent", display: "flex", flexDirection: "column", alignItems: h.center ? "center" : "flex-start", justifyContent: "center", alignSelf: "stretch", gap: 1 }}>
+                      <span>{h.label}</span>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Log rows */}
+                {reworkLog.map((row, i) => (
+                  <div key={i} style={{ display: "grid", gridTemplateColumns: LOG_COLS, minHeight: 40, alignItems: "center", borderBottom: i < reworkLog.length - 1 ? "1px solid #E5E7EB" : "none", background: "#fff" }}>
+                    <LogCell>{row.date}</LogCell>
+                    <LogCell>{row.order}</LogCell>
+                    <LogCell>{row.description ?? "–"}</LogCell>
+                    <LogCell center>{row.linePost  ?? "–"}</LogCell> 
+                    <LogCell center>{row.progPlan  ?? "–"}</LogCell>
+                    <LogCell center>{row.qcAfterP  ?? "–"}</LogCell>
+                    <LogCell center>{row.total     ?? "–"}</LogCell>
+                    <LogCell center green>{row.good ?? "–"}</LogCell>
+                    <LogCell center red={(row.bad ?? 0) > 0}>{(row.bad ?? 0) > 0 ? row.bad : "–"}</LogCell>
+                    {row.rw.map((v, j) => (
+                      <LogCell key={j} center muted={v === null}>{v !== null ? v : "–"}</LogCell>
+                    ))}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+      </div>
+    </div>
+  );
+}
