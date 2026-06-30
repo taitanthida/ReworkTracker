@@ -1,0 +1,130 @@
+-- Last Updated: 2026-06-30 --
+
+CREATE DATABASE IF NOT EXISTS ReworkTrackerDB;
+USE ReworkTrackerDB;
+
+-- ------------------------------------------------------------
+-- 1. USERS
+-- ------------------------------------------------------------
+CREATE TABLE users (
+  id          INT           NOT NULL AUTO_INCREMENT,
+  username    VARCHAR(50)   NOT NULL,
+  full_name   VARCHAR(100)  NOT NULL,
+  role        ENUM('qc', 'rw_station', 'admin') NOT NULL,
+  is_active   BOOLEAN       NOT NULL DEFAULT TRUE,
+  created_at  DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_username (username)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ------------------------------------------------------------
+-- 2. PRODUCTION ORDERS
+-- ------------------------------------------------------------
+CREATE TABLE production_orders (
+  order_id    VARCHAR(20)   NOT NULL,
+  material_id VARCHAR(20),
+  description VARCHAR(255),
+  line_post   VARCHAR(20),
+  qc_after_p  VARCHAR(20),
+  total_qty   INT,
+  source      ENUM('manual','erp') NOT NULL DEFAULT 'manual',
+  synced_at   DATETIME      NULL DEFAULT NULL,
+  created_at  DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (order_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ------------------------------------------------------------
+-- 3. DEFECT CODES
+-- ------------------------------------------------------------
+CREATE TABLE defect_codes (
+  defect_code                 VARCHAR(10)   NOT NULL,
+  description_th              VARCHAR(255),
+  description_eng             VARCHAR(255),
+  defect_cause                VARCHAR(255),
+  qa_defect_code               VARCHAR(10),
+  qa_defect_code_description  VARCHAR(255),
+  is_active                   BOOLEAN       NOT NULL DEFAULT TRUE,
+  PRIMARY KEY (defect_code)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ------------------------------------------------------------
+-- 4. REWORK LABELS
+--    หมายเหตุ: เก็บคู่ id (FK -> users.id, รองรับ login ในอนาคต)
+--    + name (string snapshot ตอนนั้น สำหรับโชว์/พิมพ์ label โดยไม่ต้อง join)
+--    ลำดับคอลัมน์: id ตามด้วย name เสมอ เพื่อความสม่ำเสมอ
+-- ------------------------------------------------------------
+CREATE TABLE rework_labels (
+  label_id          VARCHAR(30)   NOT NULL,
+  order_id          VARCHAR(20)   NOT NULL,
+  round_no          INT           NOT NULL,
+  prog_plan         VARCHAR(20)   NOT NULL,
+  qc_after_p        VARCHAR(20)   NOT NULL,
+  rw_line           VARCHAR(20)   NOT NULL,
+  status            ENUM('ISSUED','IN_PROGRESS','RETURNED','CLOSED') NOT NULL DEFAULT 'ISSUED',
+  input_qty         INT,
+  result_good_qty   INT           NULL DEFAULT NULL,
+  result_bad_qty    INT           NULL DEFAULT NULL,
+  is_scrapped       BOOLEAN       NOT NULL DEFAULT FALSE,
+
+  remark            VARCHAR(255),
+
+  -- คนตรวจ (QC)
+  qc_id             INT           NULL DEFAULT NULL,
+  qc_name           VARCHAR(50)   NULL DEFAULT NULL,
+
+  -- คนกด issue / สร้างใบ
+  issued_by_id      INT           NULL DEFAULT NULL,
+  issued_by         VARCHAR(50)   NULL DEFAULT NULL,
+
+  -- คนรับงานที่ rework station
+  received_by_id    INT           NULL DEFAULT NULL,
+  received_by       VARCHAR(50)   NULL DEFAULT NULL,
+
+  -- คนส่งคืนจาก rework station
+  returned_by_id    INT           NULL DEFAULT NULL,
+  returned_by       VARCHAR(50)   NULL DEFAULT NULL,
+
+  -- คนปิดงาน
+  closed_by_id      INT           NULL DEFAULT NULL,
+  closed_by         VARCHAR(50)   NULL DEFAULT NULL,
+
+  issued_at         DATETIME      NULL DEFAULT NULL,
+  received_at       DATETIME      NULL DEFAULT NULL,
+  returned_at       DATETIME      NULL DEFAULT NULL,
+  closed_at         DATETIME      NULL DEFAULT NULL,
+  created_at        DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+  PRIMARY KEY (label_id),
+  UNIQUE KEY uq_order_round (order_id, round_no),
+  CONSTRAINT fk_rl_order
+    FOREIGN KEY (order_id)        REFERENCES production_orders(order_id),
+  CONSTRAINT fk_rl_qc
+    FOREIGN KEY (qc_id)           REFERENCES users(id),
+  CONSTRAINT fk_rl_issued_by
+    FOREIGN KEY (issued_by_id)    REFERENCES users(id),
+  CONSTRAINT fk_rl_received_by
+    FOREIGN KEY (received_by_id)  REFERENCES users(id),
+  CONSTRAINT fk_rl_returned_by
+    FOREIGN KEY (returned_by_id)  REFERENCES users(id),
+  CONSTRAINT fk_rl_closed_by
+    FOREIGN KEY (closed_by_id)    REFERENCES users(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE INDEX idx_rl_order_id  ON rework_labels(order_id);
+CREATE INDEX idx_rl_status    ON rework_labels(status);
+CREATE INDEX idx_rl_issued_at ON rework_labels(issued_at);
+
+-- ------------------------------------------------------------
+-- 5. LABEL DEFECTS
+--    หมายเหตุ: FK ของเดิมชี้ผิดไปที่ defect_codes(code) ซึ่งไม่มีจริง
+--    column จริงในตาราง defect_codes คือ defect_code — แก้ตรงนี้แล้ว
+-- ------------------------------------------------------------
+CREATE TABLE label_defects (
+  label_id      VARCHAR(30)   NOT NULL,
+  defect_code   VARCHAR(10)   NOT NULL,
+  PRIMARY KEY (label_id, defect_code),
+  CONSTRAINT fk_ld_label
+    FOREIGN KEY (label_id)    REFERENCES rework_labels(label_id) ON DELETE CASCADE,
+  CONSTRAINT fk_ld_code
+    FOREIGN KEY (defect_code) REFERENCES defect_codes(defect_code)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
