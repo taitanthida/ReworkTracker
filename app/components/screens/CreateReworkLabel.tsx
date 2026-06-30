@@ -183,10 +183,11 @@ export function CreateReworkLabel() {
   const panelDefects = isReturned ? riDefectCodes          : defectCodes;
   const panelRemark  = isReturned ? riRemark               : remark;
   const panelProgPlan = isReturned ? (selected!.prog_plan ?? "") : progPlan;
+  const panelQcAfterP = isReturned ? (selected!.qc_after_p ?? "") : qcAfterP;
 
   // Issue button validation
   const canIssue = !isReturned
-    ? (!!orderNo && !!total && !!passed && !!rwLine && !!progPlan && !!qcName && !!qcDate && defectCodes.size > 0 && !!remark)
+    ? (!!orderNo && !!total && !!passed && !!rwLine && !!progPlan && !!qcAfterP && !!qcName && !!qcDate && defectCodes.size > 0 && !!remark)
     : allPassed
       ? (!!riPassed && !!qcName && !!qcDate)
       : (!!riPassed && !!riLine && !!qcName && !!qcDate && riDefectCodes.size > 0 && !!riRemark);
@@ -263,6 +264,7 @@ export function CreateReworkLabel() {
             status:      "ISSUED",
             defectCodes: Array.from(riDefectCodes),
             remark:      riRemark,
+            qcName:      qcName,
             issuedDate:  today,
           });
         }
@@ -285,6 +287,7 @@ export function CreateReworkLabel() {
           status:      "ISSUED",
           defectCodes: Array.from(defectCodes),
           remark,
+          qcName:      qcName,
           issuedDate:  today,
         });
       }
@@ -346,6 +349,7 @@ export function CreateReworkLabel() {
                   <InfoField label="Material ID"  value={info.materialId} />
                   <InfoField label="Description"  value={info.description} />
                   <InfoField label="Line Post"    value={info.linePost} />
+                  <InfoField label="Progress Planning"    value={info.latestProgPlan ?? "–"} />
                   <InfoField label="QC After P"   value={info.latestQcAfterP ?? "–"} />
                   <InfoField label="Qty"          value={info.total !== null ? String(info.total) : "–"} />
                   <InfoField label="Latest Label" value={info.latestLabelId ?? "–"} />
@@ -568,16 +572,15 @@ export function CreateReworkLabel() {
             {/* Summary grid */}
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px 20px", padding: "14px 16px", borderBottom: "0.5px solid #E5E7EB" }}>
               <SummaryField label="Order no."    value={isReturned ? selected!.order_id : (orderNo || "-")} />
+              <SummaryField label="Material ID"  value={isReturned ? (selected!.material_id ?? "-") : (info?.materialId ?? "-")} />
               <SummaryField label="Line Post"    value={isReturned ? (selected!.line_post ?? "-") : (info?.linePost ?? "-")} />
               <SummaryField label="Prog Plan"    value={panelProgPlan || "-"} />
+              <SummaryField label="QC After P"   value={panelQcAfterP || "-"} />
               <SummaryField label="RW Line"      value={panelLineVal || "-"} />
               <SummaryField label="Total Qty"    value={panelQty    !== null ? String(panelQty)    : "-"} />
               <SummaryField label="Passed"       value={panelPassed !== null ? String(panelPassed) : "-"} />
-              <div style={{ gridColumn: "1 / -1" }}>
-                <SummaryField label="Failed - RW"  value={panelFailed !== null ? String(panelFailed) : "-"} color={panelFailed ? "#DC2626" : undefined} />
-              </div>
-              <SummaryField label="QC Name"      value={qcName || "-"} />
-              <SummaryField label="Date"         value={qcDate || "-"} />
+              <SummaryField label="Failed - RW"  value={panelFailed !== null ? String(panelFailed) : "-"} color={panelFailed ? "#DC2626" : undefined} />
+              <SummaryField label="Round"        value={`${panelRound}`} />
               {panelDefects.size > 0 && (
                 <div style={{ gridColumn: "1 / -1" }}>
                   <p style={{ fontSize: 10, color: "#8C8985", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 600 }}>Defect Codes</p>
@@ -595,6 +598,8 @@ export function CreateReworkLabel() {
                   <SummaryField label="Remark" value={panelRemark} />
                 </div>
               )}
+              <SummaryField label="QC Name"      value={qcName || "-"} />
+              <SummaryField label="Date"         value={qcDate || "-"} />
             </div>
 
             {/* CTA buttons */}
@@ -753,13 +758,16 @@ export function CreateReworkLabel() {
               </p>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px 20px", marginBottom: 14 }}>
                 <LabelField label="Order No."   value={isReturned ? selected!.order_id : (orderNo || "–")} />
+                <LabelField label="Material ID" value={isReturned ? (selected!.material_id ?? "-") : (info?.materialId ?? "-")} />
                 <LabelField label="Line Post"   value={isReturned ? (selected!.line_post ?? "–") : (info?.linePost ?? "–")} />
                 <LabelField label="Prog Plan"   value={panelProgPlan || "–"} />
-                <LabelField label="Round"       value={`${panelRound}`} />
+                <LabelField label="QC After P"  value={panelQcAfterP || "–"} />
+                <LabelField label="RW Line"     value={panelLineVal || "–"} />
                 <div>
                   <p style={{ fontSize: 9, color: "#8C8985", fontWeight: 600, letterSpacing: "0.05em", textTransform: "uppercase", marginBottom: 2 }}>RW QTY</p>
                   <p style={{ fontSize: 20, fontWeight: 700, color: "#DC2626" }}>{panelFailed !== null ? String(panelFailed) : "–"}</p>
                 </div>
+                <LabelField label="Round"       value={`${panelRound}`} />
               </div>
               {panelDefects.size > 0 && (
                 <div style={{ marginBottom: 10 }}>

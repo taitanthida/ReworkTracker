@@ -2,7 +2,7 @@ const mysql = require('mysql2/promise');
 require('dotenv').config({ path: '../.env' });
 
 const orders = [
-  { order_id: "921394733", material_id: "5751560", description: "UNA:NECKLACE SMALL MOTIF CRY/GOS",   line_post: "6305", total_qty: 20  },
+  { order_id: "921394733", material_id: "5751560", description: "UNA:NECKLACE SMALL MOTIF CRY/GOS",    line_post: "6305", total_qty: 20  },
   { order_id: "921395680", material_id: "5646735", description: "UNA:BRACELET EMRD/CRY/RHS M",         line_post: "6321", total_qty: 72  },
   { order_id: "921397186", material_id: "5734677", description: "SWA REMIX:STRAND CRY/GOS M",          line_post: "6321", total_qty: 72  },
   { order_id: "921399205", material_id: "5682279", description: "UNA:BRACELET CRY/RHS M",              line_post: "6321", total_qty: 140 },

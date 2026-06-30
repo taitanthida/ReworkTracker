@@ -232,9 +232,12 @@ export function ReworkStation() {
                   <DetailField label="Order no."   value={label.order_id}                          />
                   <DetailField label="Material ID" value={label.material_id ?? "–"}                />
                   <DetailField label="Description" value={label.description  ?? "–"}               />
+                  <DetailField label="Line Post"   value={label.line_post  ?? "–"}                 />
+                  <DetailField label="Prog Plan"   value={label.prog_plan  ?? "–"}                 />
+                  <DetailField label="QC After P"  value={label.qc_after_p  ?? "–"}                />
                   <DetailField label="RW Line"     value={label.rw_line}                           />
-                  <DetailField label="Round"       value={String(label.round_no)}                  />
                   <DetailField label="RW Qty"      value={String(label.input_qty)} color="#DC2626" />
+                  <DetailField label="Round"       value={String(label.round_no)}                  />
                   <div><p style={labelCss}>Status</p><StatusPill status={status} /></div>
 
                   <div style={{ gridColumn: "1 / -1", display: "flex", flexWrap: "wrap", gap: 4 }}>
@@ -252,11 +255,10 @@ export function ReworkStation() {
                   <div style={{ gridColumn: "1 / -1" }}>
                     <DetailField label="Remark" value={label.remark || "–"} />
                   </div>
-
+                  <DetailField label="QC Name" value={label.qc_name || "–"} />
                   <DetailField label="Issued Date"   value={formatDateFromISO(label.issued_at)   || "–"} />
                   <DetailField label="Received Date" value={formatDateFromISO(label.received_at) || "–"} />
                   <DetailField label="Returned Date" value={formatDateFromISO(label.returned_at) || "–"} />
-                  <DetailField label="Closed Date"   value={formatDateFromISO(label.closed_at)   || "–"} />
                 </div>
 
                 <div style={{ width: "0.5px", background: "#E5E7EB", alignSelf: "stretch", flexShrink: 0 }} />

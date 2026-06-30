@@ -128,8 +128,9 @@ app.get("/labels/:id", async (req, res) => {
 // POST /labels — create new label
 app.post("/labels", async (req, res) => {
   const {
-    labelId, orderId, materialId, description, linePost, qcAfterP, total,
-    round, progPlan, rwLine, status, inputQty, issuedDate, defectCodes, remark
+    labelId, orderId, materialId, description, linePost, total,
+    qcAfterP, progPlan, rwLine, round, status, inputQty, 
+    defectCodes, remark, qcName, issuedBy, issuedDate
   } = req.body
 
   if (!labelId || !orderId || !round || !rwLine) {
@@ -161,13 +162,15 @@ app.post("/labels", async (req, res) => {
     await conn.execute(`
       INSERT INTO rework_labels (
         label_id, order_id, round_no, prog_plan, qc_after_p, rw_line,
-        status, input_qty, remark, issued_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        status, input_qty, remark, qc_name, issued_by, issued_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `, [
       labelId, orderId, round, progPlan, qcAfterP, rwLine,
       status    ?? "ISSUED",
       inputQty  ?? 0,
       remark    ?? null,
+      qcName    ?? null,
+      issuedBy  ?? null,
       parseDate(issuedDate),
     ])
 
@@ -202,9 +205,16 @@ app.patch("/labels/:id", async (req, res) => {
     isScrapped:     "is_scrapped",
     remark:         "remark",
     // users — nullable จนกว่าจะมี login
-    qcInspectorId:  "qc_inspector_id",
+    qcId:           "qc_id",          
+    qcName:         "qc_name",         // เผื่อ re-inspect ตอนปิดงานก็ใส่ชื่อ QC ได้
+    issuedById:     "issued_by_id",   
+    issuedBy:       "issued_by",      
     receivedById:   "received_by_id",
+    receivedBy:     "received_by",    
     returnedById:   "returned_by_id",
+    returnedBy:     "returned_by",  
+    closedById:     "closed_by_id",   
+    closedBy:       "closed_by", 
   }
 
   const dateFields = new Set(["receivedDate", "returnedDate", "closedDate"])

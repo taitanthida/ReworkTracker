@@ -230,6 +230,8 @@ export function ReworkDashboard() {
   const [filters,        setFilters]        = useState<GroupFilters>({});
   const [draft,          setDraft]          = useState<Set<string>>(new Set());
   const [colSearch,      setColSearch]      = useState("");
+  const [searchText,     setSearchText]     = useState("");
+  const [quickStatus,    setQuickStatus]    = useState<Status | "ALL">("ALL");  
   const [showLog,        setShowLog]        = useState(false);
   const tableRef = useRef<HTMLDivElement>(null);
   const router   = useRouter();
@@ -294,6 +296,8 @@ export function ReworkDashboard() {
 
   function clearAllFilters() {
     setFilters({});
+    setSearchText("");
+    setQuickStatus("ALL");
     setExpandedOrders(new Set());
     setExpandedLabels(new Set());
   }
@@ -344,6 +348,44 @@ export function ReworkDashboard() {
               {(expandedOrders.size > 0 || expandedLabels.size > 0) && (
                 <button onClick={() => { setExpandedOrders(new Set()); setExpandedLabels(new Set()); }} style={{ fontSize: 12, color: "#8C8985", background: "none", border: "0.5px solid #E5E7EB", borderRadius: 6, padding: "2px 10px", cursor: "pointer", fontFamily: "Inter, sans-serif" }}>Collapse all</button>
               )}
+            </div>
+          </div>
+          
+          {/* Search + quick status filters */}
+          <div style={{ padding: "12px 20px", borderBottom: "0.5px solid #E5E7EB", display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+            <input
+              value={searchText}
+              onChange={e => setSearchText(e.target.value)}
+              placeholder="Search order, material ID, description..."
+              style={{ flex: "1 1 240px", minWidth: 200, height: 36, padding: "0 12px", fontSize: 13, color: "#000000", background: "#fff", border: "0.5px solid #E5E7EB", borderRadius: 8, outline: "none", boxSizing: "border-box", fontFamily: "Inter, sans-serif" }}
+              onFocus={e => (e.target.style.borderColor = "#8DBAED")}
+              onBlur={e  => (e.target.style.borderColor = "#E5E7EB")}
+            />
+            <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+              {([
+                { key: "ALL" as const,         label: "All" },
+                { key: "ISSUED" as const,      label: "Issued" },
+                { key: "IN_PROGRESS" as const, label: "In Progress" },
+                { key: "RETURNED" as const,    label: "Returned" },
+                { key: "CLOSED" as const,      label: "Closed" },
+              ]).map(opt => {
+                const active = quickStatus === opt.key;
+                return (
+                  <button
+                    key={opt.key}
+                    onClick={() => setQuickStatus(opt.key)}
+                    style={{
+                      height: 32, padding: "0 14px", borderRadius: 999, fontSize: 12, fontWeight: 600,
+                      cursor: "pointer", fontFamily: "Inter, sans-serif",
+                      background: active ? "#8DBAED" : "#fff",
+                      color: active ? "#fff" : "#8C8985",
+                      border: active ? "0.5px solid #8DBAED" : "0.5px solid #E5E7EB",
+                    }}
+                  >
+                    {opt.label}
+                  </button>
+                );
+              })}
             </div>
           </div>
 
@@ -452,15 +494,10 @@ export function ReworkDashboard() {
                                 {/* Date + qty fields */}
                                 <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "8px 20px", marginBottom: (lbl.defect_codes.length > 0 || lbl.remark) ? 12 : 0 }}>
                                   <CardField label="RW Line"   value={lbl.rw_line} />
-                                  <CardField label="Returned"  value={formatDateFromISO(lbl.returned_at) || "–"} />
-                                  <CardField label="Issued"    value={formatDateFromISO(lbl.issued_at)   || "–"} />
-                                  <CardField label="Received"  value={formatDateFromISO(lbl.received_at) || "–"} />
                                   <CardField label="Input Qty" value={String(lbl.input_qty)} />
                                   <CardField label="Good"      value={lbl.result_good_qty !== null ? String(lbl.result_good_qty) : "–"} />
                                   <CardField label="Bad"       value={lbl.result_bad_qty  !== null ? String(lbl.result_bad_qty)  : "–"} />
-                                  <CardField label="Closed"    value={formatDateFromISO(lbl.closed_at) || "–"} />
                                 </div>
-
                                 {/* Defect codes */}
                                 {lbl.defect_codes.length > 0 && (
                                   <div style={{ marginBottom: lbl.remark ? 10 : 0 }}>
@@ -474,7 +511,6 @@ export function ReworkDashboard() {
                                     </div>
                                   </div>
                                 )}
-
                                 {/* Remark */}
                                 {lbl.remark && (
                                   <div>
@@ -482,6 +518,15 @@ export function ReworkDashboard() {
                                     <p style={{ fontSize: 12, color: "#000000" }}>{lbl.remark}</p>
                                   </div>
                                 )}
+                                <div style={{ display: "grid", gridTemplateColumns: "1fr", marginBottom: 8 }}>
+                                  <CardField label="QC Name" value={lbl.qc_name ?? "–"} />
+                                </div>
+                                <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "8px 20px", marginBottom: (lbl.defect_codes.length > 0 || lbl.remark) ? 12 : 0 }}>
+                                  <CardField label="Issued"    value={formatDateFromISO(lbl.issued_at)   || "–"} />
+                                  <CardField label="Returned"  value={formatDateFromISO(lbl.returned_at) || "–"} />
+                                  <CardField label="Received"  value={formatDateFromISO(lbl.received_at) || "–"} />
+                                  <CardField label="Closed"    value={formatDateFromISO(lbl.closed_at)   || "–"} />
+                                </div>
                               </div>
                             </div>
                           )}

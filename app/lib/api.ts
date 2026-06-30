@@ -174,6 +174,7 @@ export async function createLabel(data: {
   inputQty:     number
   defectCodes:  string[]
   remark:       string
+  qcName:       string
   issuedDate:   string   // DD/MM/YY — API แปลงให้เอง
 }) {
   const res = await fetch(`${API}/labels`, {
