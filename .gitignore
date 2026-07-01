@@ -1,5 +1,4 @@
 .next/
 node_modules/
 rework-api/node_modules/
-.env
 rework-api/.env

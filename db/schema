@@ -115,8 +115,6 @@ CREATE INDEX idx_rl_issued_at ON rework_labels(issued_at);
 
 -- ------------------------------------------------------------
 -- 5. LABEL DEFECTS
---    หมายเหตุ: FK ของเดิมชี้ผิดไปที่ defect_codes(code) ซึ่งไม่มีจริง
---    column จริงในตาราง defect_codes คือ defect_code — แก้ตรงนี้แล้ว
 -- ------------------------------------------------------------
 CREATE TABLE label_defects (
   label_id      VARCHAR(30)   NOT NULL,
