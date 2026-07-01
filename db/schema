@@ -25,7 +25,6 @@ CREATE TABLE production_orders (
   material_id VARCHAR(20),
   description VARCHAR(255),
   line_post   VARCHAR(20),
-  qc_after_p  VARCHAR(20),
   total_qty   INT,
   source      ENUM('manual','erp') NOT NULL DEFAULT 'manual',
   synced_at   DATETIME      NULL DEFAULT NULL,
