@@ -231,7 +231,7 @@ export function ReworkDashboard() {
   const [draft,          setDraft]          = useState<Set<string>>(new Set());
   const [colSearch,      setColSearch]      = useState("");
   const [searchText,     setSearchText]     = useState("");
-  const [quickStatus,    setQuickStatus]    = useState<Status | "ALL">("ALL");  
+  const [quickStatus,    setQuickStatus] = useState<Set<Status | "ALL">>(new Set(["ALL"]));
   const [showLog,        setShowLog]        = useState(false);
   const tableRef = useRef<HTMLDivElement>(null);
   const router   = useRouter();
@@ -297,7 +297,7 @@ export function ReworkDashboard() {
   function clearAllFilters() {
     setFilters({});
     setSearchText("");
-    setQuickStatus("ALL");
+    setQuickStatus(new Set(["ALL"]));
     setExpandedOrders(new Set());
     setExpandedLabels(new Set());
   }
@@ -306,14 +306,25 @@ export function ReworkDashboard() {
 
   const filteredGroups = orderGroups.filter(row => {
   const matchesColFilters = (Object.entries(filters) as [GroupColKey, Set<string>][]).every(([col, allowed]) => allowed.has(String(row[col] ?? "")));
-  const matchesQuickStatus = quickStatus === "ALL" || row.latestStatus === quickStatus;
+  const matchesQuickStatus = quickStatus.has("ALL") || quickStatus.has(row.latestStatus);
   const q = searchText.trim().toLowerCase();
-  const matchesSearch = !q || [row.orderId, row.materialId, row.description].some(v => String(v ?? "").toLowerCase().includes(q));
+  const matchesSearch = !q || 
+  [row.orderId, row.materialId, row.description].some(v => String(v ?? "").toLowerCase().includes(q)) ||
+  row.labels.some(lbl => 
+    lbl.label_id.toLowerCase().includes(q) ||
+    (lbl.rw_line ?? "").toLowerCase().includes(q) ||
+    (lbl.remark ?? "").toLowerCase().includes(q) ||
+    lbl.defect_codes.some(code => 
+      code.toLowerCase().includes(q) ||
+      (defectOptions.find(d => d.defect_code === code)?.description_th ?? "").toLowerCase().includes(q)) ||
+    (lbl.qc_name ?? "").toLowerCase().includes(q)
+  );
+
   return matchesColFilters && matchesQuickStatus && matchesSearch;
   });
 
   const isFilterActive = (col: GroupColKey) => !!filters[col];
-  const hasFilters = Object.keys(filters).length > 0 || searchText.trim() !== "" || quickStatus !== "ALL";
+  const hasFilters = Object.keys(filters).length > 0 || searchText.trim() !== "" || !quickStatus.has("ALL");
 
   // ── Render ───────────────────────────────────────────────────────────────────
 
@@ -373,11 +384,24 @@ export function ReworkDashboard() {
                 { key: "RETURNED" as const,    label: "Returned" },
                 { key: "CLOSED" as const,      label: "Closed" },
               ]).map(opt => {
-                const active = quickStatus === opt.key;
+                const active = quickStatus.has(opt.key);
                 return (
                   <button
                     key={opt.key}
-                    onClick={() => setQuickStatus(opt.key)}
+                    onClick={() => {
+                      setQuickStatus(prev => {
+                        const next = new Set(prev);
+                        if (opt.key === "ALL") return new Set(["ALL"]);
+                        next.delete("ALL");
+                        if (next.has(opt.key)) {
+                          next.delete(opt.key);
+                          if (next.size === 0) return new Set(["ALL"]);
+                        } else {
+                          next.add(opt.key);
+                        }
+                        return next;
+                      });
+                    }}
                     style={{
                       height: 32, padding: "0 14px", borderRadius: 999, fontSize: 12, fontWeight: 600,
                       cursor: "pointer", fontFamily: "Inter, sans-serif",
