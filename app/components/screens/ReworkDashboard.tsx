@@ -304,12 +304,16 @@ export function ReworkDashboard() {
 
   // ── Derived filter state ─────────────────────────────────────────────────────
 
-  const filteredGroups = orderGroups.filter(row =>
-    (Object.entries(filters) as [GroupColKey, Set<string>][]).every(([col, allowed]) => allowed.has(String(row[col] ?? "")))
-  );
+  const filteredGroups = orderGroups.filter(row => {
+  const matchesColFilters = (Object.entries(filters) as [GroupColKey, Set<string>][]).every(([col, allowed]) => allowed.has(String(row[col] ?? "")));
+  const matchesQuickStatus = quickStatus === "ALL" || row.latestStatus === quickStatus;
+  const q = searchText.trim().toLowerCase();
+  const matchesSearch = !q || [row.orderId, row.materialId, row.description].some(v => String(v ?? "").toLowerCase().includes(q));
+  return matchesColFilters && matchesQuickStatus && matchesSearch;
+  });
 
   const isFilterActive = (col: GroupColKey) => !!filters[col];
-  const hasFilters     = Object.keys(filters).length > 0;
+  const hasFilters = Object.keys(filters).length > 0 || searchText.trim() !== "" || quickStatus !== "ALL";
 
   // ── Render ───────────────────────────────────────────────────────────────────
 
@@ -356,7 +360,7 @@ export function ReworkDashboard() {
             <input
               value={searchText}
               onChange={e => setSearchText(e.target.value)}
-              placeholder="Search order, material ID, description..."
+              placeholder="Search..."
               style={{ flex: "1 1 240px", minWidth: 200, height: 36, padding: "0 12px", fontSize: 13, color: "#000000", background: "#fff", border: "0.5px solid #E5E7EB", borderRadius: 8, outline: "none", boxSizing: "border-box", fontFamily: "Inter, sans-serif" }}
               onFocus={e => (e.target.style.borderColor = "#8DBAED")}
               onBlur={e  => (e.target.style.borderColor = "#E5E7EB")}
