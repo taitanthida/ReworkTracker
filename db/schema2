@@ -57,20 +57,12 @@ CREATE TABLE defect_codes (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- ------------------------------------------------------------
--- 4. PRODUCTION LINES
---    ⚠️ ORPHANED — nothing references this table anymore since rw_line
---    was dropped from rework_labels. Kept for now (not yet decided whether
---    to drop). Uncomment below if/when confirmed unused:
---    DROP TABLE IF EXISTS production_lines;
+-- (production_lines table REMOVED — was only a FK target for rw_line,
+--  which no longer exists anywhere. Nothing references it. Dropped.)
 -- ------------------------------------------------------------
-CREATE TABLE production_lines (
-  rw_line   VARCHAR(20)   NOT NULL,
-  is_active   BOOLEAN       NOT NULL DEFAULT TRUE,
-  PRIMARY KEY (rw_line)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- ------------------------------------------------------------
--- 5. REWORK LABELS
+-- 4. REWORK LABELS
 --    prog_plan / qc_after_p / rw_line REMOVED — prog_plan & qc_after_p now
 --    on production_orders; rw_line removed entirely (superseded by line_post).
 -- ------------------------------------------------------------
@@ -127,7 +119,7 @@ CREATE INDEX idx_rl_status    ON rework_labels(status);
 CREATE INDEX idx_rl_issued_at ON rework_labels(issued_at);
 
 -- ------------------------------------------------------------
--- 6. LABEL DEFECTS
+-- 5. LABEL DEFECTS
 --    defect_qty stores qty per defect code (was silently dropped before —
 --    frontend collected it but backend never inserted it).
 -- ------------------------------------------------------------
