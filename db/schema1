@@ -1,4 +1,4 @@
--- Last Updated: 2026-07-01 (Updated production_lines and cleared unwanted columns) --
+-- Last Updated: 2026-07-02 (Redesign: moved prog_plan/qc_after_p to production_orders, added po.pack_wk, ld.defect_qty) --
 
 CREATE DATABASE IF NOT EXISTS ReworkTrackerDB;
 USE ReworkTrackerDB;
@@ -19,13 +19,18 @@ CREATE TABLE users (
 
 -- ------------------------------------------------------------
 -- 2. PRODUCTION ORDERS
+--    prog_plan / qc_after_p moved here from rework_labels (order-level,
+--    not per-round). pack_wk added (new, order-level).
 -- ------------------------------------------------------------
 CREATE TABLE production_orders (
   order_id    VARCHAR(20)   NOT NULL,
   material_id VARCHAR(20),
   description VARCHAR(255),
   line_post   VARCHAR(20),
+  prog_plan   VARCHAR(20)   NULL DEFAULT NULL,
+  qc_after_p  VARCHAR(20)   NULL DEFAULT NULL,
   total_qty   INT,
+  pack_wk     VARCHAR(20)   NULL DEFAULT NULL,
   source      ENUM('manual','erp') NOT NULL DEFAULT 'manual',
   synced_at   DATETIME      NULL DEFAULT NULL,
   created_at  DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -47,7 +52,7 @@ CREATE TABLE defect_codes (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- ------------------------------------------------------------
--- 4. PRODUCTION LINES (NEW: รองรับเมนู Send to line)
+-- 4. PRODUCTION LINES
 -- ------------------------------------------------------------
 CREATE TABLE production_lines (
   rw_line   VARCHAR(20)   NOT NULL,
@@ -57,14 +62,12 @@ CREATE TABLE production_lines (
 
 -- ------------------------------------------------------------
 -- 5. REWORK LABELS
+--    prog_plan / qc_after_p REMOVED — now on production_orders.
 -- ------------------------------------------------------------
 CREATE TABLE rework_labels (
   label_id          VARCHAR(30)   NOT NULL,
   order_id          VARCHAR(20)   NOT NULL,
   round_no          INT           NOT NULL,
-  prog_plan         VARCHAR(20)   NOT NULL,
-  qc_after_p        VARCHAR(20)   NOT NULL,
-  rw_line           VARCHAR(20)   NOT NULL,
   status            ENUM('ISSUED','IN_PROGRESS','RETURNED','CLOSED') NOT NULL DEFAULT 'ISSUED',
   input_qty         INT,
   result_good_qty   INT           NULL DEFAULT NULL,
@@ -127,6 +130,7 @@ CREATE INDEX idx_rl_issued_at ON rework_labels(issued_at);
 CREATE TABLE label_defects (
   label_id      VARCHAR(30)   NOT NULL,
   defect_code   VARCHAR(10)   NOT NULL,
+  defect_qty    INT           NOT NULL,
   PRIMARY KEY (label_id, defect_code),
   CONSTRAINT fk_ld_label
     FOREIGN KEY (label_id)    REFERENCES rework_labels(label_id) ON DELETE CASCADE,

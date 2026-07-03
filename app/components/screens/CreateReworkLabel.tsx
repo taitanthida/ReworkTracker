@@ -7,29 +7,17 @@ import { fetchReturnedLabels, fetchOrderInfoNormalized, generateLabelId, createL
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
-const PROG_PLAN_OPTIONS = ["FINS6499", "FINS6697", "FINS6698", "FINS6699"];
-
-const QC_AFTER_P_OPTIONS = [
-  "QCAP4201", "QCAP4202", "QCAP4490", "QCAP4690", "QCAP4691", 
-  "QCAP5190", "QCAP5201", "QCAP5690", "QCAP5691", "QCAP5692"];
-
-const RW_LINE_OPTIONS = [
-  "4441","4442","4443","4444","4445",
-  "5551","5552","5553","5554","5555",
-  "6661","6662","6663","6664","6665",
-];
-
 const REMARK_OPTIONS = ["ไม่ได้ PC งานดี", "เปิด RW ในระบบเต็มบิล"];
 
 // Returned queue column definitions
-type RetColKey = "label_id" | "order_id" | "material_id" | "description" | "rw_line" | "input_qty";
+type RetColKey = "label_id" | "order_id" | "material_id" | "description" | "line_post" | "input_qty";
 
 const RET_COLS: { key: RetColKey; label: string; width: string; center?: boolean }[] = [
   { key: "label_id",    label: "Label ID",    width: "140px"              },
   { key: "order_id",    label: "Order",       width: "120px"              },
   { key: "material_id", label: "Material ID", width: "120px"              },
   { key: "description", label: "Description", width: "1fr"                },
-  { key: "rw_line",     label: "RW Line",     width: "80px", center: true },
+  { key: "line_post",   label: "Line Post",   width: "80px", center: true },
   { key: "input_qty",   label: "Qty",         width: "60px", center: true },
 ];
 
@@ -47,12 +35,9 @@ export function CreateReworkLabel() {
   const [orderNo,     setOrderNo]     = useState("");
   const [total,       setTotal]       = useState("");
   const [passed,      setPassed]      = useState("");
-  const [progPlan,    setProgPlan]    = useState("");
-  const [qcAfterP,    setQcAfterP]    = useState("");
-  const [rwLine,      setRwLine]      = useState("");
   const [qcName,      setQcName]      = useState("");
   const [qcDate,      setQcDate]      = useState("");
-  const [defectCodes, setDefectCodes] = useState<Set<string>>(new Set());
+  const [defectCodes, setDefectCodes] = useState<Map<string, number>>(new Map());
   const [remark,      setRemark]      = useState("");
 
   // ── API data state ──────────────────────────────────────────────────────────
@@ -73,8 +58,7 @@ export function CreateReworkLabel() {
   // ── Re-inspection state ─────────────────────────────────────────────────────
   const [selected,      setSelected]      = useState<SelectedLabel>(null);
   const [riPassed,      setRiPassed]      = useState("");
-  const [riLine,        setRiLine]        = useState("");
-  const [riDefectCodes, setRiDefectCodes] = useState<Set<string>>(new Set());
+  const [riDefectCodes, setRiDefectCodes] = useState<Map<string, number>>(new Map());
   const [riRemark,      setRiRemark]      = useState("");
 
   // ── UI state ────────────────────────────────────────────────────────────────
@@ -173,61 +157,76 @@ export function CreateReworkLabel() {
   const hasFailures = riFailed !== null && riFailed > 0;
 
   // Right panel display values
-  const panelId      = isReturned ? selected!.label_id    : previewLabelId;
+  // prog_plan / qc_after_p / pack_wk / line_post are order-level, synced from production_orders
+  // (ERP) — read-only, same value regardless of round.
+  const panelId      = isReturned ? selected!.label_id     : previewLabelId;
   const panelDesc    = isReturned ? selected!.description  : (info?.description ?? null);
-  const panelLineVal = isReturned ? riLine                 : rwLine;
   const panelQty     = isReturned ? selected!.input_qty    : (total ? Number(total) : null);
   const panelRound   = isReturned ? selected!.round_no + 1 : 1;
   const panelPassed  = isReturned ? (riPassed ? Number(riPassed) : null) : (passed ? Number(passed) : null);
   const panelFailed  = isReturned ? riFailed               : newFailed;
   const panelDefects = isReturned ? riDefectCodes          : defectCodes;
   const panelRemark  = isReturned ? riRemark               : remark;
-  const panelProgPlan = isReturned ? (selected!.prog_plan ?? "") : progPlan;
-  const panelQcAfterP = isReturned ? (selected!.qc_after_p ?? "") : qcAfterP;
+  const panelLinePost = isReturned ? (selected!.line_post ?? "") : (info?.linePost ?? "");
+  const panelProgPlan = info?.latestProgPlan ?? "";
+  const panelQcAfterP = info?.latestQcAfterP ?? "";
+  const panelPackWk   = info?.packWk ?? "";
 
-  // Issue button validation
+  // Issue button validation — only fields the QC actually enters (qty + defect details + remark)
   const canIssue = !isReturned
-    ? (!!orderNo && !!total && !!passed && !!rwLine && !!progPlan && !!qcAfterP && !!qcName && !!qcDate && defectCodes.size > 0 && !!remark)
+    ? (!!orderNo && !!total && !!passed && !!qcName && !!qcDate && defectCodes.size > 0 && !!remark)
     : allPassed
       ? (!!riPassed && !!qcName && !!qcDate)
-      : (!!riPassed && !!riLine && !!qcName && !!qcDate && riDefectCodes.size > 0 && !!riRemark);
+      : (!!riPassed && !!qcName && !!qcDate && riDefectCodes.size > 0 && !!riRemark);
 
   // ── Form reset helpers ───────────────────────────────────────────────────────
 
   function clearLeft() {
-    setOrderNo(""); setTotal(""); setPassed(""); setProgPlan("");
-    setQcAfterP(""); setRwLine(""); setQcName(""); setQcDate("");
-    setDefectCodes(new Set()); setRemark(""); setDefectSearch("");
+    setOrderNo(""); setTotal(""); setPassed("");
+    setQcName(""); setQcDate("");
+    setDefectCodes(new Map()); setRemark(""); setDefectSearch("");
   }
 
   function handleDeselect() {
     setSelected(null);
     setOrderNo(""); setTotal(""); setPassed("");
-    setRiPassed(""); setRiLine("");
-    setRiDefectCodes(new Set()); setRiRemark("");
+    setRiPassed("");
+    setRiDefectCodes(new Map()); setRiRemark("");
     setRiDefectSearch("");
   }
 
   // ── Defect code toggles ──────────────────────────────────────────────────────
 
   function toggleDefect(code: string) {
-    setDefectCodes(prev => { const n = new Set(prev); n.has(code) ? n.delete(code) : n.add(code); return n; });
+    setDefectCodes(prev => {
+      const n = new Map(prev);
+      n.has(code) ? n.delete(code) : n.set(code, 1);
+      return n;
+    });
   }
 
   function toggleRiDefect(code: string) {
-    setRiDefectCodes(prev => { const n = new Set(prev); n.has(code) ? n.delete(code) : n.add(code); return n; });
+    setRiDefectCodes(prev => {
+      const n = new Map(prev);
+      n.has(code) ? n.delete(code) : n.set(code, 1);
+      return n;
+    });
+  }
+
+  function updateDefectQty(code: string, qty: number) {
+    setDefectCodes(prev => { const n = new Map(prev); n.set(code, qty); return n; });
+  }
+  function updateRiDefectQty(code: string, qty: number) {
+    setRiDefectCodes(prev => { const n = new Map(prev); n.set(code, qty); return n; });
   }
 
   // ── Select a returned label from the queue ───────────────────────────────────
 
   function handleSelectLabel(t: ApiLabel) {
-    console.log("selected prog_plan:", t.prog_plan); 
     setSelected(t);
     setOrderNo(t.order_id);
-    setProgPlan(t.prog_plan ?? "");
-    setQcAfterP(t.qc_after_p ?? "");
-    setRiPassed(""); setRiLine("");
-    setRiDefectCodes(new Set()); setRiRemark("");
+    setRiPassed("");
+    setRiDefectCodes(new Map()); setRiRemark("");
     setRiDefectSearch("");
   }
 
@@ -255,14 +254,11 @@ export function CreateReworkLabel() {
             materialId:  selected.material_id ?? "",
             description: selected.description ?? "",
             linePost:    selected.line_post   ?? "",
-            progPlan:    selected.prog_plan   ?? "",
-            qcAfterP:    selected.qc_after_p  ?? "",
             total:       selected.total       ?? null,
             inputQty:    currentFailed,
             round:       selected.round_no + 1,
-            rwLine:      riLine,
             status:      "ISSUED",
-            defectCodes: Array.from(riDefectCodes),
+            defectCodes: Array.from(riDefectCodes.entries()).map(([code, qty]) => ({ code, qty })),
             remark:      riRemark,
             qcName:      qcName,
             issuedDate:  today,
@@ -278,14 +274,11 @@ export function CreateReworkLabel() {
           materialId:  info?.materialId  ?? "",
           description: info?.description ?? "",
           linePost:    info?.linePost    ?? "",
-          progPlan:    progPlan,
-          qcAfterP:    qcAfterP,
           total:       info?.total       ?? null,
           inputQty:    failed,
           round:       1,
-          rwLine:      rwLine,
           status:      "ISSUED",
-          defectCodes: Array.from(defectCodes),
+          defectCodes: Array.from(defectCodes.entries()).map(([code, qty]) => ({ code, qty })),
           remark,
           qcName:      qcName,
           issuedDate:  today,
@@ -298,8 +291,8 @@ export function CreateReworkLabel() {
         setSubmitted(false);
         clearLeft();
         setSelected(null);
-        setRiPassed(""); setRiLine("");
-        setRiDefectCodes(new Set()); setRiRemark("");
+        setRiPassed("");
+        setRiDefectCodes(new Map()); setRiRemark("");
         fetchReturnedLabels().then(setReturnedLabels).catch(console.error);
       }, 2000);
 
@@ -351,6 +344,7 @@ export function CreateReworkLabel() {
                   <InfoField label="Line Post"    value={info.linePost} />
                   <InfoField label="Progress Planning"    value={info.latestProgPlan ?? "–"} />
                   <InfoField label="QC After P"   value={info.latestQcAfterP ?? "–"} />
+                  <InfoField label="Pack WK"      value={info.packWk ?? "–"} />
                   <InfoField label="Qty"          value={info.total !== null ? String(info.total) : "–"} />
                   <InfoField label="Latest Label" value={info.latestLabelId ?? "–"} />
                   <InfoField label="Latest Round" value={info.latestRoundNo !== null ? `R${info.latestRoundNo}` : "–"} />
@@ -409,93 +403,6 @@ export function CreateReworkLabel() {
                 </div>
               </div>
 
-              {/* Order no. + Progress Planning + Send to line */}
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, marginBottom: 14 }}>
-
-                {/* Order no. */}
-                <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                  <p style={{ fontSize: 11, color: "#000000", fontWeight: 500 }}>Order no.</p>
-                  <input
-                    value={isReturned ? selected!.order_id : orderNo}
-                    onChange={e => !isReturned && setOrderNo(e.target.value)}
-                    readOnly={isReturned}
-                    style={{ height: 38, padding: "0 10px", fontSize: 13, color: "#000000", background: isReturned ? "#F9FAFB" : "#fff", border: "0.5px solid #E5E7EB", borderRadius: 8, outline: "none", boxSizing: "border-box", fontFamily: "Inter, sans-serif", width: "100%" }}
-                    onFocus={e => !isReturned && (e.target.style.borderColor = "#8DBAED")}
-                    onBlur={e  => (e.target.style.borderColor = "#E5E7EB")}
-                  />
-                </div>
-
-                {/* Progress Planning — dropdown when new label, readonly when re-inspect */}
-                <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                  <p style={{ fontSize: 11, color: "#000000", fontWeight: 500 }}>Progress Planning</p>
-                  {isReturned ? (
-                    <input
-                      value={progPlan}
-                      readOnly
-                      style={{ height: 38, padding: "0 10px", fontSize: 13, color: "#000000", background: "#F9FAFB", border: "0.5px solid #E5E7EB", borderRadius: 8, outline: "none", boxSizing: "border-box", fontFamily: "Inter, sans-serif", width: "100%" }}
-                    />
-                  ) : (
-                    <div style={{ position: "relative" }}>
-                      <select
-                        value={progPlan}
-                        onChange={e => setProgPlan(e.target.value)}
-                        style={{ width: "100%", height: 38, padding: "0 32px 0 10px", fontSize: 13, color: progPlan ? "#000000" : "#8C8985", background: "#fff", border: "0.5px solid #E5E7EB", borderRadius: 8, outline: "none", appearance: "none", boxSizing: "border-box", fontFamily: "Inter, sans-serif", cursor: "pointer" }}
-                        onFocus={e => (e.target.style.borderColor = "#8DBAED")}
-                        onBlur={e  => (e.target.style.borderColor = "#E5E7EB")}
-                      >
-                        <option value="">-</option>
-                        {PROG_PLAN_OPTIONS.map(p => <option key={p} value={p}>{p}</option>)}
-                      </select>
-                      <ChevronDown size={12} color="#8C8985" style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }} />
-                    </div>
-                  )}
-                </div>
-                
-                {/* QC After P */}
-                <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                  <p style={{ fontSize: 11, color: "#000000", fontWeight: 500 }}>QC After P</p>
-                  {isReturned ? (
-                    <input
-                      value={selected!.qc_after_p ?? "–"}
-                      readOnly
-                      style={{ height: 38, padding: "0 10px", fontSize: 13, color: "#000000", background: "#F9FAFB", border: "0.5px solid #E5E7EB", borderRadius: 8, outline: "none", boxSizing: "border-box", fontFamily: "Inter, sans-serif", width: "100%" }}
-                    />
-                  ) : (
-                    <div style={{ position: "relative" }}>
-                      <select
-                        value={qcAfterP}
-                        onChange={e => setQcAfterP(e.target.value)}
-                        style={{ width: "100%", height: 38, padding: "0 32px 0 10px", fontSize: 13, color: qcAfterP ? "#000000" : "#8C8985", background: "#fff", border: "0.5px solid #E5E7EB", borderRadius: 8, outline: "none", appearance: "none", boxSizing: "border-box", fontFamily: "Inter, sans-serif", cursor: "pointer" }}
-                        onFocus={e => (e.target.style.borderColor = "#8DBAED")}
-                        onBlur={e  => (e.target.style.borderColor = "#E5E7EB")}
-                      >
-                        <option value="">-</option>
-                        {QC_AFTER_P_OPTIONS.map(p => <option key={p} value={p}>{p}</option>)}
-                      </select>
-                      <ChevronDown size={12} color="#8C8985" style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }} />
-                    </div>
-                  )}
-                </div>
-
-                {/* Send to line (RW Line) */}
-                <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                  <p style={{ fontSize: 11, color: "#000000", fontWeight: 500 }}>Send to line</p>
-                  <div style={{ position: "relative" }}>
-                    <select
-                      value={panelLineVal}
-                      onChange={e => isReturned ? setRiLine(e.target.value) : setRwLine(e.target.value)}
-                      style={{ width: "100%", height: 38, padding: "0 32px 0 10px", fontSize: 13, color: panelLineVal ? "#000000" : "#8C8985", background: "#fff", border: "0.5px solid #E5E7EB", borderRadius: 8, outline: "none", appearance: "none", boxSizing: "border-box", fontFamily: "Inter, sans-serif", cursor: "pointer" }}
-                      onFocus={e => (e.target.style.borderColor = "#8DBAED")}
-                      onBlur={e  => (e.target.style.borderColor = "#E5E7EB")}
-                    >
-                      <option value="">-</option>
-                      {RW_LINE_OPTIONS.map(l => <option key={l} value={l}>{l}</option>)}
-                    </select>
-                    <ChevronDown size={12} color="#8C8985" style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }} />
-                  </div>
-                </div>
-              </div>
-
               {/* Total / Passed / Failed */}
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, marginBottom: 14 }}>
                 <NumberField label="Total"  value={isReturned ? String(selected!.input_qty) : total}  onChange={!isReturned ? setTotal : undefined} readOnly={isReturned} bg={isReturned ? "#F9FAFB" : "#fff"} />
@@ -503,38 +410,42 @@ export function CreateReworkLabel() {
                 <NumberField label="Failed" value={panelFailed !== null ? String(panelFailed) : ""} readOnly bg="#FCEBEB" labelColor="#A32D2D" />
               </div>
 
-              {/* Defect Code dropdown — swaps between new and re-inspect */}
-              {isReturned ? (
-                <DefectDropdown
-                  selectedCodes={riDefectCodes} onToggle={toggleRiDefect}
-                  searchVal={riDefectSearch}    setSearch={setRiDefectSearch}
-                  isOpen={riDefectOpen}         setOpen={setRiDefectOpen}
-                  dropRef={riDefectRef}         options={defectOptions}
-                />
-              ) : (
-                <DefectDropdown
-                  selectedCodes={defectCodes}  onToggle={toggleDefect}
-                  searchVal={defectSearch}     setSearch={setDefectSearch}
-                  isOpen={defectOpen}          setOpen={setDefectOpen}
-                  dropRef={defectRef}          options={defectOptions}
-                />
-              )}
+              {/* Defect Details + Remark */}
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 14 }}>
 
-              {/* Remark */}
-              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                <p style={{ fontSize: 11, color: "#000000", fontWeight: 500 }}>Remark</p>
-                <div style={{ position: "relative" }}>
-                  <select
-                    value={isReturned ? riRemark : remark}
-                    onChange={e => isReturned ? setRiRemark(e.target.value) : setRemark(e.target.value)}
-                    style={{ width: "100%", height: 38, padding: "0 32px 0 10px", fontSize: 13, color: (isReturned ? riRemark : remark) ? "#000000" : "#8C8985", background: "#fff", border: "0.5px solid #E5E7EB", borderRadius: 8, outline: "none", appearance: "none", boxSizing: "border-box", fontFamily: "Inter, sans-serif", cursor: "pointer" }}
-                    onFocus={e => (e.target.style.borderColor = "#8DBAED")}
-                    onBlur={e  => (e.target.style.borderColor = "#E5E7EB")}
-                  >
-                    <option value="">-</option>
-                    {REMARK_OPTIONS.map(r => <option key={r} value={r}>{r}</option>)}
-                  </select>
-                  <ChevronDown size={12} color="#8C8985" style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }} />
+                {/* Defect Details dropdown — swaps between new and re-inspect */}
+                {isReturned ? (
+                  <DefectDropdown
+                    selectedCodes={riDefectCodes} onToggle={toggleRiDefect} onUpdateQty={updateRiDefectQty}
+                    searchVal={riDefectSearch}    setSearch={setRiDefectSearch}
+                    isOpen={riDefectOpen}         setOpen={setRiDefectOpen}
+                    dropRef={riDefectRef}         options={defectOptions}
+                  />
+                ) : (
+                  <DefectDropdown
+                    selectedCodes={defectCodes}  onToggle={toggleDefect} onUpdateQty={updateDefectQty}
+                    searchVal={defectSearch}     setSearch={setDefectSearch}
+                    isOpen={defectOpen}          setOpen={setDefectOpen}
+                    dropRef={defectRef}          options={defectOptions}
+                  />
+                )}
+
+                {/* Remark */}
+                <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                  <p style={{ fontSize: 11, color: "#000000", fontWeight: 500 }}>Remark</p>
+                  <div style={{ position: "relative" }}>
+                    <select
+                      value={isReturned ? riRemark : remark}
+                      onChange={e => isReturned ? setRiRemark(e.target.value) : setRemark(e.target.value)}
+                      style={{ width: "100%", height: 38, padding: "0 32px 0 10px", fontSize: 13, color: (isReturned ? riRemark : remark) ? "#000000" : "#8C8985", background: "#fff", border: "0.5px solid #E5E7EB", borderRadius: 8, outline: "none", appearance: "none", boxSizing: "border-box", fontFamily: "Inter, sans-serif", cursor: "pointer" }}
+                      onFocus={e => (e.target.style.borderColor = "#8DBAED")}
+                      onBlur={e  => (e.target.style.borderColor = "#E5E7EB")}
+                    >
+                      <option value="">-</option>
+                      {REMARK_OPTIONS.map(r => <option key={r} value={r}>{r}</option>)}
+                    </select>
+                    <ChevronDown size={12} color="#8C8985" style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }} />
+                  </div>
                 </div>
               </div>
             </Card>
@@ -570,26 +481,35 @@ export function CreateReworkLabel() {
             </div>
 
             {/* Summary grid */}
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px 20px", padding: "14px 16px", borderBottom: "0.5px solid #E5E7EB" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "12px 20px", padding: "14px 16px", borderBottom: "0.5px solid #E5E7EB" }}>
               <SummaryField label="Order no."    value={isReturned ? selected!.order_id : (orderNo || "-")} />
               <SummaryField label="Material ID"  value={isReturned ? (selected!.material_id ?? "-") : (info?.materialId ?? "-")} />
-              <SummaryField label="Line Post"    value={isReturned ? (selected!.line_post ?? "-") : (info?.linePost ?? "-")} />
+              <SummaryField label="Pack WK"      value={panelPackWk || "-"} />
+              <SummaryField label="Line Post"    value={panelLinePost || "-"} />
               <SummaryField label="Prog Plan"    value={panelProgPlan || "-"} />
               <SummaryField label="QC After P"   value={panelQcAfterP || "-"} />
-              <SummaryField label="RW Line"      value={panelLineVal || "-"} />
-              <SummaryField label="Total Qty"    value={panelQty    !== null ? String(panelQty)    : "-"} />
+              <SummaryField label="Total"    value={panelQty    !== null ? String(panelQty)    : "-"} />
               <SummaryField label="Passed"       value={panelPassed !== null ? String(panelPassed) : "-"} />
               <SummaryField label="Failed - RW"  value={panelFailed !== null ? String(panelFailed) : "-"} color={panelFailed ? "#DC2626" : undefined} />
-              <SummaryField label="Round"        value={`${panelRound}`} />
               {panelDefects.size > 0 && (
                 <div style={{ gridColumn: "1 / -1" }}>
-                  <p style={{ fontSize: 10, color: "#8C8985", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 600 }}>Defect Codes</p>
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
-                    {Array.from(panelDefects).map(code => (
-                      <span key={code} style={{ padding: "2px 10px", borderRadius: 999, background: "#000000", color: "#ffffff", fontSize: 11, fontWeight: 500 }}>
-                        {code}{defectOptions.find(d => d.defect_code === code) ? ` · ${defectOptions.find(d => d.defect_code === code)!.description_th}` : ""}
-                      </span>
-                    ))}
+                  <p style={{ fontSize: 11, color: "#8C8985", fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 6 }}>Defect Details</p>
+                  <div style={{ border: "0.5px solid #E5E7EB", borderRadius: 6, overflow: "hidden" }}>
+                    <div style={{ display: "grid", gridTemplateColumns: "70px 1fr 40px", background: "#F0EEE4", padding: "3px 8px", gap: 8 }}>
+                      <span style={{ fontSize: 8, fontWeight: 600, color: "#8C8985", textTransform: "uppercase" }}>Code</span>
+                      <span style={{ fontSize: 8, fontWeight: 600, color: "#8C8985", textTransform: "uppercase" }}>Description</span>
+                      <span style={{ fontSize: 8, fontWeight: 600, color: "#8C8985", textTransform: "uppercase", textAlign: "center" }}>Qty</span>
+                    </div>
+                    {Array.from(panelDefects.entries()).map(([code, qty]) => {
+                      const opt = defectOptions.find(d => d.defect_code === code);
+                      return (
+                        <div key={code} style={{ display: "grid", gridTemplateColumns: "70px 1fr 40px", padding: "4px 8px", gap: 8, borderTop: "0.5px solid #E5E7EB", alignItems: "center" }}>
+                          <span style={{ fontSize: 10, fontWeight: 600, color: "#000000" }}>{code}</span>
+                          <span style={{ fontSize: 10, color: "#000000" }}>{opt?.description_th ?? "–"}</span>
+                          <span style={{ fontSize: 10, fontWeight: 600, color: "#000000", textAlign: "center" }}>{qty}</span>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               )}
@@ -600,6 +520,7 @@ export function CreateReworkLabel() {
               )}
               <SummaryField label="QC Name"      value={qcName || "-"} />
               <SummaryField label="Date"         value={qcDate || "-"} />
+              <SummaryField label="Round"        value={`${panelRound}`} />
             </div>
 
             {/* CTA buttons */}
@@ -713,7 +634,7 @@ export function CreateReworkLabel() {
                 <RetCell><span style={{ fontSize: 12, color: "#000000" }}>{t.order_id}</span></RetCell>
                 <RetCell><span style={{ fontSize: 12, color: "#000000" }}>{t.material_id}</span></RetCell>
                 <RetCell><span style={{ fontSize: 13, color: "#000000" }}>{t.description}</span></RetCell>
-                <RetCell center><span style={{ fontSize: 12, color: "#000000" }}>{t.rw_line}</span></RetCell>
+                <RetCell center><span style={{ fontSize: 12, color: "#000000" }}>{t.line_post}</span></RetCell>
                 <RetCell center><span style={{ fontSize: 12, color: "#DC2626", fontWeight: 600 }}>{t.input_qty}</span></RetCell>
                 <RetCell><span style={{ display: "inline-flex", padding: "2px 10px", borderRadius: 999, background: "#DCFCE7", color: "#166534", fontSize: 11, fontWeight: 600 }}>Returned</span></RetCell>
                 <RetCell center><svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M4 2l4 4-4 4" stroke="#8C8985" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg></RetCell>
@@ -725,67 +646,78 @@ export function CreateReworkLabel() {
 
       {/* ── Print Preview Modal ── */}
       {showPrint && (
-        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 300, display: "flex", alignItems: "center", justifyContent: "center" }}>
-          <div style={{ background: "#F0EEE4", borderRadius: 12, padding: 24, maxHeight: "90vh", overflowY: "auto", width: 500 }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
-              <p style={{ fontSize: 13, fontWeight: 600, color: "#000000" }}>Print Preview</p>
-              <div style={{ display: "flex", gap: 8 }}>
-                <button onClick={() => window.print()} style={{ height: 32, padding: "0 14px", background: "#8DBAED", border: "none", borderRadius: 8, fontSize: 12, fontWeight: 600, color: "#fff", cursor: "pointer", fontFamily: "Inter, sans-serif", display: "flex", alignItems: "center", gap: 6 }}>
-                  <Printer size={13} /> Print
-                </button>
-                <button onClick={() => setShowPrint(false)} style={{ width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center", background: "#fff", border: "0.5px solid #E5E7EB", borderRadius: 8, cursor: "pointer", color: "#8C8985" }}>
-                  <X size={14} />
-                </button>
+      <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 300, display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <div style={{ background: "#F0EEE4", borderRadius: 12, padding: 24, maxHeight: "90vh", overflowY: "auto", width: 500 }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+            <p style={{ fontSize: 13, fontWeight: 600, color: "#000000" }}>Print Preview</p>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button onClick={() => window.print()} style={{ height: 32, padding: "0 14px", background: "#8DBAED", border: "none", borderRadius: 8, fontSize: 12, fontWeight: 600, color: "#fff", cursor: "pointer", fontFamily: "Inter, sans-serif", display: "flex", alignItems: "center", gap: 6 }}>
+                <Printer size={13} /> Print
+              </button>
+              <button onClick={() => setShowPrint(false)} style={{ width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center", background: "#fff", border: "0.5px solid #E5E7EB", borderRadius: 8, cursor: "pointer", color: "#8C8985" }}>
+                <X size={14} />
+              </button>
+            </div>
+          </div>
+
+          {/* label */}
+          <div id="print-area" style={{ width: "100%", margin: "0 auto", background: "#fff", padding: 16, boxSizing: "border-box", fontFamily: "Inter, sans-serif" }}>
+            <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 16, paddingBottom: 12, borderBottom: "1.5px solid #000000" }}>
+              <div>
+                <p style={{ fontSize: 12, fontWeight: 600, color: "#8C8985", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 2 }}>REWORK LABEL</p>
+                <p style={{ fontSize: 20, fontWeight: 700, color: "#000000", letterSpacing: "0.02em" }}>{panelId ?? "–"}</p>
+              </div>
+              <div style={{ textAlign: "right", display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
+                <span style={{ padding: "3px 12px", borderRadius: 999, color: "#000000", fontSize: 12, fontWeight: 600 }}>
+                  LINE · {panelLinePost || "–"}
+                </span>
+                <span style={{ padding: "3px 12px", borderRadius: 999, fontSize: 12, fontWeight: 600, color: "#000000" }}>
+                  PACK WK · {panelPackWk || "–"}
+                </span>
               </div>
             </div>
-
-            {/* A6 label card */}
-            <div style={{ width: 397, margin: "0 auto", background: "#fff", border: "1px solid #E5E7EB", borderRadius: 8, padding: 24, boxSizing: "border-box", fontFamily: "Inter, sans-serif" }}>
-              <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 16, paddingBottom: 12, borderBottom: "1.5px solid #000000" }}>
-                <div>
-                  <p style={{ fontSize: 8, fontWeight: 600, color: "#8C8985", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 2 }}>REWORK LABEL</p>
-                  <p style={{ fontSize: 20, fontWeight: 700, color: "#000000", letterSpacing: "0.02em" }}>{panelId ?? "–"}</p>
-                </div>
-                <div style={{ textAlign: "right" }}>
-                  <span style={{ display: "inline-flex", padding: "3px 12px", borderRadius: 999, background: "#ADCFF1", color: "#000000", fontSize: 12, fontWeight: 600, marginBottom: 6 }}>
-                    RW Line {panelLineVal || "–"}
-                  </span>
-                  <p style={{ fontSize: 11, fontWeight: 600, color: "#000000", marginTop: 4 }}>{qcDate || "–"}</p>
-                </div>
-              </div>
-              <p style={{ fontSize: 12, color: "#000000", marginBottom: 14, lineHeight: 1.4 }}>
-                {(isReturned ? selected!.material_id : info?.materialId) ? `${isReturned ? selected!.material_id : info?.materialId} · ` : ""}{panelDesc ?? "–"}
-              </p>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px 20px", marginBottom: 14 }}>
-                <LabelField label="Order No."   value={isReturned ? selected!.order_id : (orderNo || "–")} />
-                <LabelField label="Material ID" value={isReturned ? (selected!.material_id ?? "-") : (info?.materialId ?? "-")} />
-                <LabelField label="Line Post"   value={isReturned ? (selected!.line_post ?? "–") : (info?.linePost ?? "–")} />
-                <LabelField label="Prog Plan"   value={panelProgPlan || "–"} />
-                <LabelField label="QC After P"  value={panelQcAfterP || "–"} />
-                <LabelField label="RW Line"     value={panelLineVal || "–"} />
-                <div>
-                  <p style={{ fontSize: 9, color: "#8C8985", fontWeight: 600, letterSpacing: "0.05em", textTransform: "uppercase", marginBottom: 2 }}>RW QTY</p>
-                  <p style={{ fontSize: 20, fontWeight: 700, color: "#DC2626" }}>{panelFailed !== null ? String(panelFailed) : "–"}</p>
-                </div>
-                <LabelField label="Round"       value={`${panelRound}`} />
+            <p style={{ fontSize: 12, color: "#000000", marginBottom: 14, lineHeight: 1.4 }}>
+              {(isReturned ? selected!.material_id : info?.materialId) ? `${isReturned ? selected!.material_id : info?.materialId} · ` : ""}{panelDesc ?? "–"}
+            </p>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "10px 20px", marginBottom: 14 }}>
+              <LabelField label="Order No."   value={isReturned ? selected!.order_id : (orderNo || "–")} />
+              <LabelField label="Material ID" value={isReturned ? (selected!.material_id ?? "-") : (info?.materialId ?? "-")} />
+              <LabelField label="Line Post"   value={isReturned ? (selected!.line_post ?? "–") : (info?.linePost ?? "–")} />
+              <LabelField label="Prog Plan"   value={panelProgPlan || "–"} />
+              <LabelField label="QC After P"  value={panelQcAfterP || "–"} />
+              <div>
+                <p style={{ fontSize: 9, color: "#8C8985", fontWeight: 600, letterSpacing: "0.05em", textTransform: "uppercase", marginBottom: 2 }}>RW QTY</p>
+                <p style={{ fontSize: 20, fontWeight: 700, color: "#DC2626" }}>{panelFailed !== null ? String(panelFailed) : "–"}</p>
               </div>
               {panelDefects.size > 0 && (
-                <div style={{ marginBottom: 10 }}>
-                  <p style={{ fontSize: 9, color: "#8C8985", fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 6 }}>Defect Codes</p>
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
-                    {Array.from(panelDefects).map(code => (
-                      <span key={code} style={{ padding: "2px 8px", borderRadius: 999, border: "1px solid #000000", background: "#000000", color: "#fff", fontSize: 10, fontWeight: 500 }}>
-                        {code}{defectOptions.find(d => d.defect_code === code) ? ` · ${defectOptions.find(d => d.defect_code === code)!.description_th}` : ""}
-                      </span>
-                    ))}
+                <div style={{ gridColumn: "1 / -1" }}>
+                  <p style={{ fontSize: 9, color: "#8C8985", fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 6 }}>Defect Details</p>
+                  <div style={{ border: "0.5px solid #E5E7EB", borderRadius: 6, overflow: "hidden" }}>
+                    {Array.from(panelDefects.entries()).map(([code, qty]) => {
+                      const opt = defectOptions.find(d => d.defect_code === code);
+                      return (
+                        <div key={code} style={{ display: "grid", gridTemplateColumns: "70px 1fr 40px", padding: "4px 8px", gap: 8, borderTop: "0.5px solid #E5E7EB", alignItems: "center" }}>
+                          <span style={{ fontSize: 12, fontWeight: 600, color: "#000000" }}>{code}</span>
+                          <span style={{ fontSize: 12, color: "#000000" }}>{opt?.description_th ?? "–"}</span>
+                          <span style={{ fontSize: 12, fontWeight: 600, color: "#000000", textAlign: "center" }}>{qty}</span>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               )}
-              {panelRemark && <div style={{ marginBottom: 10 }}><LabelField label="Remark" value={panelRemark} /></div>}
+              {panelRemark && (
+                <div style={{ gridColumn: "1 / -1" }}>
+                  <LabelField label="Remark" value={panelRemark} />
+                </div>
+              )}
               <LabelField label="QC Name" value={qcName || "–"} />
+              <LabelField label="Date"    value={qcDate || "–"} />
+              <LabelField label="Round"   value={`${panelRound}`} />
             </div>
           </div>
         </div>
+      </div>
       )}
     </div>
   );
@@ -793,9 +725,10 @@ export function CreateReworkLabel() {
 
 // ── DefectDropdown ────────────────────────────────────────────────────────────
 
-function DefectDropdown({ selectedCodes, onToggle, searchVal, setSearch, isOpen, setOpen, dropRef, options }: {
-  selectedCodes: Set<string>
+function DefectDropdown({ selectedCodes, onToggle, onUpdateQty, searchVal, setSearch, isOpen, setOpen, dropRef, options }: {
+  selectedCodes: Map<string, number>
   onToggle:      (code: string) => void
+  onUpdateQty:   (code: string, qty: number) => void
   searchVal:     string
   setSearch:     (v: string) => void
   isOpen:        boolean
@@ -810,19 +743,37 @@ function DefectDropdown({ selectedCodes, onToggle, searchVal, setSearch, isOpen,
 
   return (
     <div ref={dropRef} style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 14, position: "relative" }}>
-      <p style={{ fontSize: 11, color: "#000000", fontWeight: 500 }}>Defect Code</p>
+      <p style={{ fontSize: 11, color: "#000000", fontWeight: 500 }}>Defect Details</p>
 
-      {/* Selected chips */}
+      {/* mini table */}
       {selectedCodes.size > 0 && (
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 2 }}>
-          {Array.from(selectedCodes).map(code => {
+        <div style={{ border: "0.5px solid #E5E7EB", borderRadius: 8, overflow: "hidden", marginBottom: 6 }}>
+          {/* Header */}
+          <div style={{ display: "grid", gridTemplateColumns: "80px 1fr 60px 28px", background: "#F0EEE4", padding: "4px 10px", gap: 8 }}>
+            <span style={{ fontSize: 10, fontWeight: 600, color: "#8C8985", textTransform: "uppercase" }}>Code</span>
+            <span style={{ fontSize: 10, fontWeight: 600, color: "#8C8985", textTransform: "uppercase" }}>Description</span>
+            <span style={{ fontSize: 10, fontWeight: 600, color: "#8C8985", textTransform: "uppercase", textAlign: "center" }}>Qty</span>
+            <span />
+          </div>
+          {/* Rows */}
+          {Array.from(selectedCodes.entries()).map(([code, qty]) => {
             const opt = options.find(d => d.defect_code === code);
             return (
-              <button key={code} onClick={() => onToggle(code)}
-                style={{ display: "flex", alignItems: "center", gap: 5, padding: "3px 8px 3px 12px", borderRadius: 999, fontSize: 12, fontWeight: 500, cursor: "pointer", border: "none", background: "#000000", color: "#fff", fontFamily: "Inter, sans-serif" }}>
-                <span>{code}{opt ? ` · ${opt.description_th}` : ""}</span>
-                <span style={{ fontSize: 14, lineHeight: 1, opacity: 0.7 }}>×</span>
-              </button>
+              <div key={code} style={{ display: "grid", gridTemplateColumns: "80px 1fr 60px 28px", padding: "6px 10px", gap: 8, alignItems: "center", borderTop: "0.5px solid #E5E7EB" }}>
+                <span style={{ fontSize: 12, fontWeight: 600, color: "#000000" }}>{code}</span>
+                <span style={{ fontSize: 12, color: "#000000" }}>{opt?.description_th ?? ""}</span>
+                <input
+                  type="number" min={1} value={qty === 0 ? "" : qty}
+                  onChange={e => onUpdateQty(code, e.target.value === "" ? 0 : Number(e.target.value))}
+                  style={{ width: "100%", height: 28, padding: "0 6px", color: "#000000", fontSize: 12, fontWeight: 600, textAlign: "center", border: "0.5px solid #E5E7EB", borderRadius: 6, outline: "none", fontFamily: "Inter, sans-serif" }}
+                  onFocus={e => (e.target.style.borderColor = "#8DBAED")}
+                  onBlur={e  => (e.target.style.borderColor = "#E5E7EB")}
+                />
+                <button onClick={() => onToggle(code)}
+                  style={{ width: 24, height: 24, display: "flex", alignItems: "center", justifyContent: "center", background: "none", border: "0.5px solid #E5E7EB", borderRadius: 4, cursor: "pointer", color: "#000000", fontSize: 14 }}>
+                  ×
+                </button>
+              </div>
             );
           })}
         </div>

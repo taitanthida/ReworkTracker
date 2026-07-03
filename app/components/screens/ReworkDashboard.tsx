@@ -1,6 +1,6 @@
 "use client"
 import { useState, useRef, useEffect, type CSSProperties, type ReactNode } from "react";
-import { ArrowLeft, ClipboardList, BadgeAlert, UserRoundCog, PackageSearch, XCircle, ChevronDown, ChevronRight, Download } from "lucide-react";
+import { ArrowLeft, ClipboardList, BadgeAlert, UserRoundCog, PackageSearch, XCircle, ChevronDown, ChevronRight, Download, Printer, X } from "lucide-react";
 import { useRouter } from "next/navigation"
 import { fetchAllLabels, formatDateFromISO, fetchDefectCodes, type ApiLabel, type DefectCode } from "../../lib/api"
 
@@ -19,6 +19,7 @@ type OrderGroup = {
 }
 
 type ReworkLogRow = {
+  packWk:      string | null | undefined;
   date:        string;
   order:       string;
   description: string | null | undefined;
@@ -59,6 +60,7 @@ const GROUP_COLS: { key: GroupColKey; label: string; width: string }[] = [
 const TABLE_GRID = `32px ${GROUP_COLS.map(c => c.width).join(" ")}`;
 
 const LOG_HEADERS: { label: string; center: boolean; color?: string; bg?: string }[] = [
+  { label: "PACK WK",     center: true  },
   { label: "DATE",        center: false },
   { label: "ORDER",       center: false },
   { label: "DESCRIPTION", center: false },
@@ -76,7 +78,7 @@ const LOG_HEADERS: { label: string; center: boolean; color?: string; bg?: string
   { label: "R6", center: true, color: "#4C1D95", bg: "#EDE9FE" },
 ];
 
-const LOG_COLS = "90px 120px 1fr 90px 90px 90px 90px 90px 90px 40px 40px 40px 40px 40px 40px";
+const LOG_COLS = "90px 90px 120px 1fr 90px 90px 90px 90px 90px 90px 40px 40px 40px 40px 40px 40px";
 
 // ── Data helpers ──────────────────────────────────────────────────────────────
 
@@ -123,6 +125,7 @@ function buildReworkLog(labels: ApiLabel[]): ReworkLogRow[] {
     group.forEach(l => { if (l.round_no >= 1 && l.round_no <= 6) rw[l.round_no - 1] = l.result_good_qty; });
 
     return {
+      packWk:      latest.pack_wk,
       date:        formatDateFromISO(first.issued_at),
       order:       first.order_id,
       description: first.description,
@@ -201,6 +204,10 @@ function LogCell({ children, center, muted, green, red }: {
   );
 }
 
+function LabelFieldD({ label, value }: { label: string; value: string }) {
+return <div><p style={{ fontSize: 9, color: "#8C8985", fontWeight: 600, letterSpacing: "0.05em", textTransform: "uppercase", marginBottom: 2 }}>{label}</p><p style={{ fontSize: 12, fontWeight: 600, color: "#000000" }}>{value}</p></div>;
+}
+
 // ── Main component ────────────────────────────────────────────────────────────
 
 export function ReworkDashboard() {
@@ -232,6 +239,7 @@ export function ReworkDashboard() {
   const [colSearch,      setColSearch]      = useState("");
   const [searchText,     setSearchText]     = useState("");
   const [quickStatus,    setQuickStatus] = useState<Set<Status | "ALL">>(new Set(["ALL"]));
+  const [printLabel,     setPrintLabel] = useState<ApiLabel | null>(null);
   const [showLog,        setShowLog]        = useState(false);
   const tableRef = useRef<HTMLDivElement>(null);
   const router   = useRouter();
@@ -312,7 +320,7 @@ export function ReworkDashboard() {
   [row.orderId, row.materialId, row.description].some(v => String(v ?? "").toLowerCase().includes(q)) ||
   row.labels.some(lbl => 
     lbl.label_id.toLowerCase().includes(q) ||
-    (lbl.rw_line ?? "").toLowerCase().includes(q) ||
+    (lbl.line_post ?? "").toLowerCase().includes(q) ||
     (lbl.remark ?? "").toLowerCase().includes(q) ||
     lbl.defect_codes.some(code => 
       code.toLowerCase().includes(q) ||
@@ -325,6 +333,7 @@ export function ReworkDashboard() {
 
   const isFilterActive = (col: GroupColKey) => !!filters[col];
   const hasFilters = Object.keys(filters).length > 0 || searchText.trim() !== "" || !quickStatus.has("ALL");
+
 
   // ── Render ───────────────────────────────────────────────────────────────────
 
@@ -495,7 +504,7 @@ export function ReworkDashboard() {
                           {/* Round compact row */}
                           <div
                             onClick={() => toggleLabel(lbl.label_id)}
-                            style={{ display: "grid", gridTemplateColumns: "52px 180px 160px 1fr 110px", minHeight: 40, alignItems: "center", cursor: "pointer", borderBottom: (!isDetailOpen && li < group.labels.length - 1) ? "1px solid #E5E7EB" : "none", background: isDetailOpen ? "#fff" : "transparent", paddingLeft: 20 }}
+                            style={{ display: "grid", gridTemplateColumns: "52px 180px 160px 1fr 110px 40px", minHeight: 40, alignItems: "center", cursor: "pointer", borderBottom: (!isDetailOpen && li < group.labels.length - 1) ? "1px solid #E5E7EB" : "none", background: isDetailOpen ? "#fff" : "transparent", paddingLeft: 20 }}
                             onMouseEnter={e => { if (!isDetailOpen) e.currentTarget.style.background = "#F9FAFB"; }}
                             onMouseLeave={e => { e.currentTarget.style.background = isDetailOpen ? "#fff" : "transparent"; }}
                           >
@@ -512,6 +521,12 @@ export function ReworkDashboard() {
                               Issued {formatDateFromISO(lbl.issued_at)}{lbl.closed_at ? ` → Closed ${formatDateFromISO(lbl.closed_at)}` : ""}
                             </div>
                             <div style={{ fontSize: 12, color: "#9CA3AF" }}>{lbl.input_qty} pcs</div>
+                            <button
+                              onClick={e => { e.stopPropagation(); setPrintLabel(lbl); }}
+                              style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 28, height: 28, background: "none", borderRadius: 6, cursor: "pointer", color: "#8C8985", marginRight: 20 }}
+                            >
+                              <Printer size={12} />
+                            </button>
                           </div>
 
                           {/* Level 3: Detail card */}
@@ -521,7 +536,7 @@ export function ReworkDashboard() {
 
                                 {/* Date + qty fields */}
                                 <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "8px 20px", marginBottom: (lbl.defect_codes.length > 0 || lbl.remark) ? 12 : 0 }}>
-                                  <CardField label="RW Line"   value={lbl.rw_line} />
+                                  <CardField label="RW Line"   value={lbl.line_post ?? "–"} />
                                   <CardField label="Input Qty" value={String(lbl.input_qty)} />
                                   <CardField label="Good"      value={lbl.result_good_qty !== null ? String(lbl.result_good_qty) : "–"} />
                                   <CardField label="Bad"       value={lbl.result_bad_qty  !== null ? String(lbl.result_bad_qty)  : "–"} />
@@ -598,6 +613,7 @@ export function ReworkDashboard() {
                 {/* Log rows */}
                 {reworkLog.map((row, i) => (
                   <div key={i} style={{ display: "grid", gridTemplateColumns: LOG_COLS, minHeight: 40, alignItems: "center", borderBottom: i < reworkLog.length - 1 ? "1px solid #E5E7EB" : "none", background: "#fff" }}>
+                    <LogCell center>{row.packWk ?? "–"}</LogCell>
                     <LogCell>{row.date}</LogCell>
                     <LogCell>{row.order}</LogCell>
                     <LogCell>{row.description ?? "–"}</LogCell>
@@ -617,6 +633,80 @@ export function ReworkDashboard() {
           )}
         </div>
 
+        {printLabel && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 300, display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <div style={{ background: "#F0EEE4", borderRadius: 12, padding: 24, maxHeight: "90vh", overflowY: "auto", width: 500 }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+              <p style={{ fontSize: 13, fontWeight: 600, color: "#000000" }}>Print Preview</p>
+              <div style={{ display: "flex", gap: 8 }}>
+                <button onClick={() => window.print()} style={{ height: 32, padding: "0 14px", background: "#8DBAED", border: "none", borderRadius: 8, fontSize: 12, fontWeight: 600, color: "#fff", cursor: "pointer", fontFamily: "Inter, sans-serif", display: "flex", alignItems: "center", gap: 6 }}>
+                  <Printer size={13} /> Print
+                </button>
+                <button onClick={() => setPrintLabel(null)} style={{ width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center", background: "#fff", border: "0.5px solid #E5E7EB", borderRadius: 8, cursor: "pointer", color: "#8C8985" }}>
+                  <X size={14} />
+                </button>
+              </div>
+            </div>
+
+            {/* label */}
+            <div id="print-area" style={{ width: "100%", margin: "0 auto", background: "#fff", padding: 16, boxSizing: "border-box", fontFamily: "Inter, sans-serif" }}>
+              <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 16, paddingBottom: 12, borderBottom: "1.5px solid #000000" }}>
+                <div>
+                  <p style={{ fontSize: 12, fontWeight: 600, color: "#8C8985", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 2 }}>REWORK LABEL</p>
+                  <p style={{ fontSize: 20, fontWeight: 700, color: "#000000", letterSpacing: "0.02em" }}>{printLabel.label_id}</p>
+                </div>
+                <div style={{ textAlign: "right", display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
+                  <span style={{ padding: "3px 12px", borderRadius: 999, color: "#000000", fontSize: 12, fontWeight: 600 }}>
+                    LINE · {printLabel.line_post || "–"}
+                  </span>
+                  <span style={{ padding: "3px 12px", borderRadius: 999, fontSize: 12, fontWeight: 600, color: "#000000" }}>
+                    PACK WK · {printLabel.pack_wk || "–"}
+                  </span>
+                </div>
+              </div>
+              <p style={{ fontSize: 12, color: "#000000", marginBottom: 14, lineHeight: 1.4 }}>
+                {printLabel.material_id ? `${printLabel.material_id} · ` : ""}{printLabel.description ?? "–"}
+              </p>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "10px 20px", marginBottom: 14 }}>
+                <LabelFieldD label="Order No."   value={printLabel.order_id} />
+                <LabelFieldD label="Material ID" value={printLabel.material_id ?? "-"} />
+                <LabelFieldD label="Line Post"   value={printLabel.line_post ?? "–"} />
+                <LabelFieldD label="Prog Plan"   value={printLabel.prog_plan ?? "–"} />
+                <LabelFieldD label="QC After P"  value={printLabel.qc_after_p ?? "–"} />
+                <div>
+                  <p style={{ fontSize: 9, color: "#8C8985", fontWeight: 600, letterSpacing: "0.05em", textTransform: "uppercase", marginBottom: 2 }}>RW QTY</p>
+                  <p style={{ fontSize: 20, fontWeight: 700, color: "#DC2626" }}>{printLabel.input_qty}</p>
+                </div>
+                {printLabel.defect_details.length > 0 && (
+                  <div style={{ gridColumn: "1 / -1" }}>
+                    <p style={{ fontSize: 9, color: "#8C8985", fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 6 }}>Defect Details</p>
+                    <div style={{ border: "0.5px solid #E5E7EB", borderRadius: 6, overflow: "hidden" }}>
+                      {printLabel.defect_details.map(({ code, qty }) => {
+                        const opt = defectOptions.find(d => d.defect_code === code);
+                        return (
+                          <div key={code} style={{ display: "grid", gridTemplateColumns: "70px 1fr 40px", padding: "4px 8px", gap: 8, borderTop: "0.5px solid #E5E7EB", alignItems: "center" }}>
+                            <span style={{ fontSize: 12, fontWeight: 600, color: "#000000" }}>{code}</span>
+                            <span style={{ fontSize: 12, color: "#000000" }}>{opt?.description_th ?? "–"}</span>
+                            <span style={{ fontSize: 12, fontWeight: 600, color: "#000000", textAlign: "center" }}>{qty}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+                {printLabel.remark && (
+                  <div style={{ gridColumn: "1 / -1" }}>
+                    <LabelFieldD label="Remark" value={printLabel.remark} />
+                  </div>
+                )}
+                <LabelFieldD label="QC Name" value={printLabel.qc_name ?? "–"} />
+                <LabelFieldD label="Date"    value={formatDateFromISO(printLabel.issued_at) || "–"} />
+                <LabelFieldD label="Round"   value={`${printLabel.round_no}`} />
+              </div>
+            </div>
+          </div>
+        </div>
+        )}
       </div>
     </div>
   );

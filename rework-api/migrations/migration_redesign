@@ -1,0 +1,49 @@
+-- Migration 002
+-- 1) Move prog_plan / qc_after_p from rework_labels -> production_orders (order-level, not per-round)
+-- 2) Add pack_wk to production_orders
+-- Run against ReworkTrackerDB. Safe for existing data — backfills before dropping columns.
+
+USE ReworkTrackerDB;
+
+START TRANSACTION;
+
+-- 1. Add new columns to production_orders
+ALTER TABLE production_orders
+  ADD COLUMN prog_plan  VARCHAR(20) NULL DEFAULT NULL AFTER line_post,
+  ADD COLUMN qc_after_p VARCHAR(20) NULL DEFAULT NULL AFTER prog_plan,
+  ADD COLUMN pack_wk    VARCHAR(20) NULL DEFAULT NULL AFTER total_qty;
+
+-- 2. Backfill prog_plan / qc_after_p from each order's latest rework round
+UPDATE production_orders po
+JOIN (
+  SELECT rl.order_id, rl.prog_plan, rl.qc_after_p
+  FROM rework_labels rl
+  JOIN (
+    SELECT order_id, MAX(round_no) AS max_round
+    FROM rework_labels
+    GROUP BY order_id
+  ) latest ON rl.order_id = latest.order_id AND rl.round_no = latest.max_round
+) x ON po.order_id = x.order_id
+SET po.prog_plan  = x.prog_plan,
+    po.qc_after_p = x.qc_after_p;
+
+-- pack_wk has no prior source column — leave NULL, set via app going forward.
+
+-- 3. Drop the now-redundant columns from rework_labels
+ALTER TABLE rework_labels
+  DROP COLUMN prog_plan,
+  DROP COLUMN qc_after_p;
+
+COMMIT;
+
+-- ------------------------------------------------------------
+-- Rollback (run manually if needed — data entered into production_orders
+-- after this migration will NOT be restored to rework_labels rounds):
+-- ------------------------------------------------------------
+-- ALTER TABLE rework_labels
+--   ADD COLUMN prog_plan  VARCHAR(20) NOT NULL DEFAULT '' AFTER round_no,
+--   ADD COLUMN qc_after_p VARCHAR(20) NOT NULL DEFAULT '' AFTER prog_plan;
+-- ALTER TABLE production_orders
+--   DROP COLUMN prog_plan,
+--   DROP COLUMN qc_after_p,
+--   DROP COLUMN pack_wk;

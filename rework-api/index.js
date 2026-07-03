@@ -29,11 +29,20 @@ function parseDate(str) {
 }
 
 // ดึง label พร้อม defect_codes + JOIN production_orders
+function parseDefectDetails(str) {
+  if (!str) return []
+  return str.split(",").map(pair => {
+    const [code, qty] = pair.split(":")
+    return { code, qty: Number(qty) }
+  })
+}
+
 async function fetchLabelWithDefects(conn, labelId) {
   const [rows] = await conn.execute(
     `SELECT rl.*,
-            po.material_id, po.description, po.line_post, po.total_qty AS total,
-            GROUP_CONCAT(ld.defect_code ORDER BY ld.defect_code SEPARATOR ',') AS defect_codes
+            po.material_id, po.description, po.line_post, po.prog_plan, po.qc_after_p, po.total_qty AS total, po.pack_wk,
+            GROUP_CONCAT(ld.defect_code ORDER BY ld.defect_code SEPARATOR ',') AS defect_codes,
+            GROUP_CONCAT(CONCAT(ld.defect_code, ':', ld.defect_qty) ORDER BY ld.defect_code SEPARATOR ',') AS defect_details
      FROM rework_labels rl
      LEFT JOIN production_orders po ON po.order_id = rl.order_id
      LEFT JOIN label_defects ld ON ld.label_id = rl.label_id
@@ -43,7 +52,8 @@ async function fetchLabelWithDefects(conn, labelId) {
   )
   if (rows.length === 0) return null
   const row = rows[0]
-  row.defect_codes = row.defect_codes ? row.defect_codes.split(",") : []
+  row.defect_codes   = row.defect_codes ? row.defect_codes.split(",") : []
+  row.defect_details = parseDefectDetails(row.defect_details)
   return row
 }
 
@@ -56,8 +66,9 @@ app.get("/labels", async (req, res) => {
   try {
     const [rows] = await pool.execute(`
       SELECT rl.*,
-             po.material_id, po.description, po.line_post, po.total_qty AS total,
-             GROUP_CONCAT(ld.defect_code ORDER BY ld.defect_code SEPARATOR ',') AS defect_codes
+             po.material_id, po.description, po.line_post, po.prog_plan, po.qc_after_p, po.total_qty AS total, po.pack_wk,
+             GROUP_CONCAT(ld.defect_code ORDER BY ld.defect_code SEPARATOR ',') AS defect_codes,
+             GROUP_CONCAT(CONCAT(ld.defect_code, ':', ld.defect_qty) ORDER BY ld.defect_code SEPARATOR ',') AS defect_details
       FROM rework_labels rl
       LEFT JOIN production_orders po ON po.order_id = rl.order_id
       LEFT JOIN label_defects ld ON ld.label_id = rl.label_id
@@ -65,7 +76,8 @@ app.get("/labels", async (req, res) => {
       ORDER BY rl.created_at DESC
     `)
     rows.forEach(r => {
-      r.defect_codes = r.defect_codes ? r.defect_codes.split(",") : []
+      r.defect_codes   = r.defect_codes ? r.defect_codes.split(",") : []
+      r.defect_details = parseDefectDetails(r.defect_details)
     })
     res.json(rows)
   } catch (err) {
@@ -96,8 +108,9 @@ app.get("/labels/queue", async (req, res) => {
   try {
     const [rows] = await pool.execute(`
       SELECT rl.*,
-             po.material_id, po.description, po.line_post, po.total_qty AS total,
-             GROUP_CONCAT(ld.defect_code ORDER BY ld.defect_code SEPARATOR ',') AS defect_codes
+             po.material_id, po.description, po.line_post, po.prog_plan, po.qc_after_p, po.total_qty AS total, po.pack_wk,
+             GROUP_CONCAT(ld.defect_code ORDER BY ld.defect_code SEPARATOR ',') AS defect_codes,
+             GROUP_CONCAT(CONCAT(ld.defect_code, ':', ld.defect_qty) ORDER BY ld.defect_code SEPARATOR ',') AS defect_details
       FROM rework_labels rl
       LEFT JOIN production_orders po ON po.order_id = rl.order_id
       LEFT JOIN label_defects ld ON ld.label_id = rl.label_id
@@ -106,7 +119,8 @@ app.get("/labels/queue", async (req, res) => {
       ORDER BY rl.created_at DESC
     `)
     rows.forEach(r => {
-      r.defect_codes = r.defect_codes ? r.defect_codes.split(",") : []
+      r.defect_codes   = r.defect_codes ? r.defect_codes.split(",") : []
+      r.defect_details = parseDefectDetails(r.defect_details)
     })
     res.json(rows)
   } catch (err) {
@@ -129,12 +143,12 @@ app.get("/labels/:id", async (req, res) => {
 app.post("/labels", async (req, res) => {
   const {
     labelId, orderId, materialId, description, linePost, total,
-    qcAfterP, progPlan, rwLine, round, status, inputQty, 
+    round, status, inputQty,
     defectCodes, remark, qcName, issuedBy, issuedDate
   } = req.body
 
-  if (!labelId || !orderId || !round || !rwLine) {
-    return res.status(400).json({ error: "labelId, orderId, round, rwLine are required" })
+  if (!labelId || !orderId || !round) {
+    return res.status(400).json({ error: "labelId, orderId, round are required" })
   }
 
   const conn = await pool.getConnection()
@@ -161,11 +175,11 @@ app.post("/labels", async (req, res) => {
     // insert rework_label
     await conn.execute(`
       INSERT INTO rework_labels (
-        label_id, order_id, round_no, prog_plan, qc_after_p, rw_line,
+        label_id, order_id, round_no,
         status, input_qty, remark, qc_name, issued_by, issued_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     `, [
-      labelId, orderId, round, progPlan, qcAfterP, rwLine,
+      labelId, orderId, round,
       status    ?? "ISSUED",
       inputQty  ?? 0,
       remark    ?? null,
@@ -174,12 +188,14 @@ app.post("/labels", async (req, res) => {
       parseDate(issuedDate),
     ])
 
-    // insert label_defects
+    // insert label_defects (each item is { code, qty })
     const codes = Array.isArray(defectCodes) ? defectCodes : []
-    for (const code of codes) {
+    for (const { code, qty } of codes) {
       await conn.execute(
-        "INSERT IGNORE INTO label_defects (label_id, defect_code) VALUES (?, ?)",
-        [labelId, code]
+        `INSERT INTO label_defects (label_id, defect_code, defect_qty)
+         VALUES (?, ?, ?)
+         ON DUPLICATE KEY UPDATE defect_qty = VALUES(defect_qty)`,
+        [labelId, code, qty ?? 1]
       )
     }
 

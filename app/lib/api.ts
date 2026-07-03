@@ -15,8 +15,6 @@ export type ApiLabel = {
   label_id:         string
   order_id:         string
   round_no:         number
-  prog_plan:        string
-  rw_line:          string
   status:           "ISSUED" | "IN_PROGRESS" | "RETURNED" | "CLOSED"
   input_qty:        number
   result_good_qty:  number | null
@@ -24,6 +22,7 @@ export type ApiLabel = {
   is_scrapped:      number
   qc_name:          string | null
   defect_codes:     string[]
+  defect_details:   { code: string; qty: number }[]
   remark:           string | null
   issued_at:        string | null
   received_at:      string | null
@@ -34,8 +33,10 @@ export type ApiLabel = {
   material_id:      string | null
   description:      string | null
   line_post:        string | null
+  prog_plan:        string | null
   qc_after_p:       string | null
   total:            number | null
+  pack_wk:          string | null
   // user FKs — nullable จนกว่าจะมี login
   issued_by:        number | null
   qc_inspector_id:  number | null
@@ -48,7 +49,10 @@ export type ApiOrder = {
   material_id: string | null
   description: string | null
   line_post:   string | null
+  prog_plan:   string | null
+  qc_after_p:  string | null
   total_qty:   number | null
+  pack_wk:     string | null
   source:      "manual" | "erp"
   synced_at:   string | null
   created_at:  string
@@ -64,6 +68,7 @@ export type OrderInfo = {
   linePost:     string
   description:  string
   total:        number | null
+  packWk:       string | null
   // latest label info (null ถ้ายังไม่เคย rework)
   latestLabelId:   string | null
   latestRoundNo:   number | null
@@ -135,15 +140,16 @@ export async function fetchOrderInfoNormalized(orderId: string): Promise<OrderIn
     const { order, latestLabel }: { order: ApiOrder; latestLabel: ApiLabel | null } = await res.json()
     return {
       materialId:      order.material_id   ?? "",
-      linePost:        order.line_post     ?? "",
       description:     order.description   ?? "",
       total:           order.total_qty,
+      linePost:        order.line_post     ?? "",
+      latestProgPlan:  order.prog_plan  ?? null,
+      latestQcAfterP:  order.qc_after_p ?? null,
+      packWk:          order.pack_wk    ?? null,
       latestLabelId:   latestLabel?.label_id   ?? null,
       latestRoundNo:   latestLabel?.round_no   ?? null,
       latestIssuedAt:  latestLabel?.issued_at  ?? null,
       latestClosedAt:  latestLabel?.closed_at  ?? null,
-      latestProgPlan: latestLabel?.prog_plan   ?? null,
-      latestQcAfterP: latestLabel?.qc_after_p  ?? null,
     }
   } catch { return null }
 }
@@ -165,14 +171,11 @@ export async function createLabel(data: {
   materialId:   string
   description:  string
   linePost:     string
-  qcAfterP:     string
   total:        number | null
   round:        number
-  progPlan:     string
-  rwLine:       string
   status?:      string
   inputQty:     number
-  defectCodes:  string[]
+  defectCodes: { code: string; qty: number }[]
   remark:       string
   qcName:       string
   issuedDate:   string   // DD/MM/YY — API แปลงให้เอง

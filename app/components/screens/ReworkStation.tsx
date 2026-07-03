@@ -13,14 +13,14 @@ const BADGE: Record<Status, { label: string; bg: string; color: string }> = {
   CLOSED:      { label: "Closed",      bg: "#EDE9FE", color: "#4C1D95" },
 };
 
-type ColKey = "label_id" | "order_id" | "material_id" | "description" | "rw_line" | "input_qty" | "status";
+type ColKey = "label_id" | "order_id" | "material_id" | "description" | "line_post" | "input_qty" | "status";
 
 const COLS: { key: ColKey; label: string; width: string; center?: boolean }[] = [
   { key: "label_id",    label: "Label ID",    width: "140px"              },
   { key: "order_id",    label: "Order",       width: "120px"              },
   { key: "material_id", label: "Material ID", width: "120px"              },
   { key: "description", label: "Description", width: "1fr"                },
-  { key: "rw_line",     label: "RW Line",     width: "80px",  center: true },
+  { key: "line_post",   label: "Line Post",   width: "80px",  center: true },
   { key: "input_qty",   label: "RW Qty",      width: "60px",  center: true },
   { key: "status",      label: "Status",      width: "120px"              },
 ];
@@ -235,8 +235,8 @@ export function ReworkStation() {
                   <DetailField label="Line Post"   value={label.line_post  ?? "–"}                 />
                   <DetailField label="Prog Plan"   value={label.prog_plan  ?? "–"}                 />
                   <DetailField label="QC After P"  value={label.qc_after_p  ?? "–"}                />
-                  <DetailField label="RW Line"     value={label.rw_line}                           />
                   <DetailField label="RW Qty"      value={String(label.input_qty)} color="#DC2626" />
+                  <DetailField label="Pack WK"     value={label.pack_wk  ?? "–"}                 />
                   <DetailField label="Round"       value={String(label.round_no)}                  />
                   <div><p style={labelCss}>Status</p><StatusPill status={status} /></div>
 
@@ -390,7 +390,7 @@ export function ReworkStation() {
               <Cell><span style={{ fontSize: 12, color: "#000000" }}>{row.order_id}</span></Cell>
               <Cell><span style={{ fontSize: 12, color: "#000000" }}>{row.material_id}</span></Cell>
               <Cell><span style={{ fontSize: 13, color: "#000000" }}>{row.description}</span></Cell>
-              <Cell center><span style={{ fontSize: 12, color: "#000000", fontWeight: 600 }}>{row.rw_line}</span></Cell>
+              <Cell center><span style={{ fontSize: 12, color: "#000000", fontWeight: 600 }}>{row.line_post}</span></Cell>
               <Cell center><span style={{ fontSize: 12, color: "#DC2626", fontWeight: 600 }}>{row.input_qty}</span></Cell>
               <Cell><StatusPill status={row.status} /></Cell>
               <Cell center><ChevronRight size={14} color="#8C8985" /></Cell>
