@@ -27,7 +27,7 @@ body {
 
 @media print {
   @page { 
-    size: A6 portrait; 
+    size: A7 portrait; 
     margin: 0; 
   }
   body {
@@ -40,7 +40,7 @@ body {
 	position: fixed;
 	top: 0;
 	left: 0;
-	width: 105mm;
-	height: 148mm;
+	width: 74mm;
+	height: 105mm;
   }
 }
