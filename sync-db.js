@@ -53,7 +53,7 @@ async function syncDatabase() {
     console.log('Saved to MySQL Successfully!');
 
   } catch (error) {
-    console.error('An error occurred druing Sync:', error);
+    console.error('An Error occurred druing Sync:', error);
   } finally {
     // Close Connection
     if (mssqlPool) await mssql.close();

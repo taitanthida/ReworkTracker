@@ -402,20 +402,13 @@ type DefectCode = {
 ---
 
 ## Planned (TODO)
+- [ ] Sync 2 databases
+
 - [ ] **`issued_by`, `received_by`, `returned_by`, `closed_by` flow** — ตอนนี้มีแค่ `qc_name` ที่ใช้งานจริง ฟิลด์อื่นเตรียม column ไว้รอ flow/UI ที่เกี่ยวข้อง (เช่นหน้า ReworkStation ต้องมีช่องกรอกชื่อคนรับ/คืนงาน)
 - [ ] **`issued_at` เวลาแม่นยำ** — ถ้าต้องการ SLA tracking ในอนาคต เปลี่ยนฟอร์มจาก `<input type="date">` → `<input type="datetime-local">` และแก้ `parseDate()` ให้รับเวลาจริงแทน hardcode `00:00:00` (ไม่ใช่ด่วน เก็บไว้ทำทีหลังได้)
 - [ ] Guard check role ในแต่ละ screen (ตอนนี้ mock ที่ HomePage เท่านั้น)
 - [ ] Login system จริง — เมื่อมีแล้ว ใช้ `_id` columns (`qc_id`, `issued_by_id` ฯลฯ) ที่เตรียมไว้แล้วผูกกับ session user ได้ทันที
 - [ ] Toast notifications แทน console.error
-
-### ทำเสร็จแล้ว (ย้ายมาจาก TODO เดิม)
-- [x] `qcName` insert ใน `POST /labels` — เดิมเป็นบั๊กที่ทำให้ QC Name ไม่ขึ้นหน้า Rework Station แก้แล้ว
-- [x] `defect_qty` เก็บจริงใน `label_defects` — เดิม frontend เก็บ qty ต่อ defect code แต่ backend ไม่เคย insert ค่านี้ ตอนนี้ persist ครบและแสดงในหน้าปริ้นแล้ว
-- [x] `prog_plan` / `qc_after_p` ย้ายไป `production_orders`, `rw_line` ลบทิ้งถาวร (แทนด้วย `line_post`)
-- [x] `pack_wk` เพิ่มเข้า `production_orders` + แสดงในทุกหน้า (CreateReworkLabel, ReworkStation, ReworkDashboard) + คอลัมน์ใน Rework Log table
-- [x] Print preview หน้า ReworkDashboard ทำให้ตรงกับหน้า CreateReworkLabel เป๊ะ (layout, mini defect table, LINE·/PACK WK· header)
-- [x] แก้ SQL alias bug (`total`/`pack_wk` สลับ) + data corruption ใน `production_orders.total_qty`
-- [x] ลบตาราง `production_lines` ทิ้ง (orphaned หลัง `rw_line` ถูกลบ)
 
 ---
 
