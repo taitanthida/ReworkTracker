@@ -661,56 +661,61 @@ export function CreateReworkLabel() {
           </div>
 
           {/* label */}
-          <div id="print-area" style={{ width: "100%", margin: "0 auto", background: "#fff", padding: 16, boxSizing: "border-box", fontFamily: "Inter, sans-serif" }}>
-            <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 16, paddingBottom: 12, borderBottom: "1.5px solid #000000" }}>
+          <div id="print-area" style={{ width: "105mm", height: "74mm", margin: "0 auto", background: "#fff", padding: "8px 12px", boxSizing: "border-box", fontFamily: "Inter, sans-serif" }}>
+            <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 6, paddingBottom: 4, borderBottom: "1.5px solid #000000" }}>
               <div>
-                <p style={{ fontSize: 12, fontWeight: 600, color: "#8C8985", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 2 }}>REWORK LABEL</p>
-                <p style={{ fontSize: 20, fontWeight: 700, color: "#000000", letterSpacing: "0.02em" }}>{panelId ?? "–"}</p>
+                <p style={{ fontSize: 8, fontWeight: 600, color: "#8C8985", letterSpacing: "0.08em", textTransform: "uppercase", margin: 0 }}>REWORK LABEL</p>
+                <p style={{ fontSize: 14, fontWeight: 700, color: "#000000", letterSpacing: "0.02em", margin: 0 }}>{panelId ?? "–"}</p>
               </div>
-              <div style={{ textAlign: "right", display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
-                <span style={{ padding: "3px 12px", borderRadius: 999, color: "#000000", fontSize: 12, fontWeight: 600 }}>
+              <div style={{ textAlign: "right", display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 2 }}>
+                <span style={{ color: "#000000", fontSize: 9, fontWeight: 600 }}>
                   LINE · {panelLinePost || "–"}
                 </span>
-                <span style={{ padding: "3px 12px", borderRadius: 999, fontSize: 12, fontWeight: 600, color: "#000000" }}>
+                <span style={{ fontSize: 9, fontWeight: 600, color: "#000000" }}>
                   PACK WK · {panelPackWk || "–"}
                 </span>
               </div>
             </div>
-            <p style={{ fontSize: 12, color: "#000000", marginBottom: 14, lineHeight: 1.4 }}>
+            
+            <p style={{ fontSize: 9, color: "#000000", marginBottom: 6, lineHeight: 1.2, fontWeight: 500 }}>
               {(isReturned ? selected!.material_id : info?.materialId) ? `${isReturned ? selected!.material_id : info?.materialId} · ` : ""}{panelDesc ?? "–"}
             </p>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "10px 20px", marginBottom: 14 }}>
+
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: "4px 8px", marginBottom: 6 }}>
               <LabelField label="Order No."   value={isReturned ? selected!.order_id : (orderNo || "–")} />
-              <LabelField label="Material ID" value={isReturned ? (selected!.material_id ?? "-") : (info?.materialId ?? "-")} />
               <LabelField label="Line Post"   value={isReturned ? (selected!.line_post ?? "–") : (info?.linePost ?? "–")} />
               <LabelField label="Prog Plan"   value={panelProgPlan || "–"} />
               <LabelField label="QC After P"  value={panelQcAfterP || "–"} />
               <div>
-                <p style={{ fontSize: 9, color: "#8C8985", fontWeight: 600, letterSpacing: "0.05em", textTransform: "uppercase", marginBottom: 2 }}>RW QTY</p>
-                <p style={{ fontSize: 20, fontWeight: 700, color: "#DC2626" }}>{panelFailed !== null ? String(panelFailed) : "–"}</p>
+                <p style={{ fontSize: 8, color: "#8C8985", fontWeight: 600, letterSpacing: "0.05em", textTransform: "uppercase", margin: 0 }}>RW QTY</p>
+                <p style={{ fontSize: 14, fontWeight: 700, color: "#DC2626", margin: 0, lineHeight: 1 }}>{panelFailed !== null ? String(panelFailed) : "–"}</p>
               </div>
+
               {panelDefects.size > 0 && (
                 <div style={{ gridColumn: "1 / -1" }}>
-                  <p style={{ fontSize: 9, color: "#8C8985", fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 6 }}>Defect Details</p>
-                  <div style={{ border: "0.5px solid #E5E7EB", borderRadius: 6, overflow: "hidden" }}>
+                  <p style={{ fontSize: 8, color: "#8C8985", fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 2 }}>Defect Details</p>
+                  <div style={{ 
+					display: "grid", 
+					gridTemplateColumns: "1fr 1fr", 
+					columnGap: 16,                  
+					rowGap: 0, 
+					alignItems: "start" 
+				  }}>
                     {Array.from(panelDefects.entries()).map(([code, qty]) => {
                       const opt = defectOptions.find(d => d.defect_code === code);
                       return (
-                        <div key={code} style={{ display: "grid", gridTemplateColumns: "70px 1fr 40px", padding: "4px 8px", gap: 8, borderTop: "0.5px solid #E5E7EB", alignItems: "center" }}>
-                          <span style={{ fontSize: 12, fontWeight: 600, color: "#000000" }}>{code}</span>
-                          <span style={{ fontSize: 12, color: "#000000" }}>{opt?.description_th ?? "–"}</span>
-                          <span style={{ fontSize: 12, fontWeight: 600, color: "#000000", textAlign: "center" }}>{qty}</span>
+                        <div key={code} style={{ display: "grid", gridTemplateColumns: "40px 1fr 25px", padding: "2px 4px", gap: 4, borderTop: "0.5px solid #E5E7EB", alignItems: "center" }}>
+                          <span style={{ fontSize: 8, fontWeight: 600, color: "#000000" }}>{code}</span>
+                          <span style={{ fontSize: 8, color: "#000000", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{opt?.description_th ?? "–"}</span>
+                          <span style={{ fontSize: 8, fontWeight: 600, color: "#000000", textAlign: "center" }}>{qty}</span>
                         </div>
                       );
                     })}
                   </div>
                 </div>
               )}
-              {panelRemark && (
-                <div style={{ gridColumn: "1 / -1" }}>
-                  <LabelField label="Remark" value={panelRemark} />
-                </div>
-              )}
+
+			  <LabelField label="Remark" value={panelRemark} />
               <LabelField label="QC Name" value={qcName || "–"} />
               <LabelField label="Date"    value={qcDate || "–"} />
               <LabelField label="Round"   value={`${panelRound}`} />
@@ -834,7 +839,7 @@ function SummaryField({ label, value, color }: { label: string; value: string; c
   return <div><p style={{ fontSize: 10, color: "#8C8985", marginBottom: 2, textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 600 }}>{label}</p><p style={{ fontSize: 14, fontWeight: 600, color: color ?? "#000000" }}>{value}</p></div>;
 }
 function LabelField({ label, value }: { label: string; value: string }) {
-  return <div><p style={{ fontSize: 9, color: "#8C8985", fontWeight: 600, letterSpacing: "0.05em", textTransform: "uppercase", marginBottom: 2 }}>{label}</p><p style={{ fontSize: 12, fontWeight: 600, color: "#000000" }}>{value}</p></div>;
+  return <div><p style={{ fontSize: 8, color: "#8C8985", fontWeight: 600, letterSpacing: "0.05em", textTransform: "uppercase", marginBottom: 2 }}>{label}</p><p style={{ fontSize: 9, fontWeight: 600, color: "#000000" }}>{value}</p></div>;
 }
 function NumberField({ label, value, onChange, readOnly = false, bg, labelColor = "#000000" }: {
   label: string; value: string; onChange?: (v: string) => void; readOnly?: boolean; bg: string; labelColor?: string;

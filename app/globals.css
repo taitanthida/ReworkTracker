@@ -27,8 +27,8 @@ body {
 
 @media print {
   @page { 
-    size: A7 portrait; 
-    margin: 0; 
+    size: 105mm 74mm portrait;
+    margin: 0;
   }
   body {
 	height: 0;
@@ -37,10 +37,19 @@ body {
   body * { visibility: hidden; }
   #print-area, #print-area * { visibility: visible; }
   #print-area {
-	position: fixed;
-	top: 0;
-	left: 0;
-	width: 74mm;
-	height: 105mm;
+	position: absolute !important; /* เปลี่ยนเป็น absolute ป้องกันการแผ่ขยาย */
+	top: 0 !important;
+	left: 0 !important;
+	display: inline-block !important; /* บังคับให้ขนาดกล่องหดตามเนื้อหา ไม่แผ่ตามหน้ากระดาษ */
+	width: 105mm !important;    /* ล็อกความกว้าง A7 */
+	height: 74mm !important;  /* ล็อกความสูง A7 */
+	max-width: 105mm !important;  /* ดัดหลังเบราว์เซอร์ ห้ามกว้างเกินนี้เด็ดขาด */
+	max-height: 74mm !important; /* ห้ามสูงเกินนี้เด็ดขาด */
+	padding: 4mm !important;   
+	box-sizing: border-box !important;
+	background: #fff !important;
+	overflow: hidden !important;
+	margin: 0 !important;
+	transform: none !important;
   }
 }
