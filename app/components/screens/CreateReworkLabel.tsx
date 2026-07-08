@@ -661,14 +661,14 @@ export function CreateReworkLabel() {
           </div>
 
           {/* label */}
-          <div id="print-area" style={{ width: "105mm", height: "74mm", margin: "0 auto", background: "#fff", padding: "8px 12px", boxSizing: "border-box", fontFamily: "Inter, sans-serif" }}>
+          <div id="print-area" style={{ width: "57mm", height: "152mm", margin: "0 auto", background: "#fff", padding: "8px 12px", boxSizing: "border-box", fontFamily: "Inter, sans-serif" }}>
             <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 6, paddingBottom: 4, borderBottom: "1.5px solid #000000" }}>
               <div>
-                <p style={{ fontSize: 8, fontWeight: 600, color: "#8C8985", letterSpacing: "0.08em", textTransform: "uppercase", margin: 0 }}>REWORK LABEL</p>
+                <p style={{ fontSize: 9, fontWeight: 600, color: "#8C8985", letterSpacing: "0.08em", textTransform: "uppercase", margin: 0 }}>REWORK LABEL</p>
                 <p style={{ fontSize: 14, fontWeight: 700, color: "#000000", letterSpacing: "0.02em", margin: 0 }}>{panelId ?? "–"}</p>
               </div>
               <div style={{ textAlign: "right", display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 2 }}>
-                <span style={{ color: "#000000", fontSize: 9, fontWeight: 600 }}>
+                <span style={{ color: "#000000", fontSize: 8, fontWeight: 600 }}>
                   LINE · {panelLinePost || "–"}
                 </span>
                 <span style={{ fontSize: 9, fontWeight: 600, color: "#000000" }}>
@@ -681,7 +681,7 @@ export function CreateReworkLabel() {
               {(isReturned ? selected!.material_id : info?.materialId) ? `${isReturned ? selected!.material_id : info?.materialId} · ` : ""}{panelDesc ?? "–"}
             </p>
 
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: "4px 8px", marginBottom: 6 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "4px 8px", marginBottom: 6 }}>
               <LabelField label="Order No."   value={isReturned ? selected!.order_id : (orderNo || "–")} />
               <LabelField label="Line Post"   value={isReturned ? (selected!.line_post ?? "–") : (info?.linePost ?? "–")} />
               <LabelField label="Prog Plan"   value={panelProgPlan || "–"} />
@@ -695,12 +695,12 @@ export function CreateReworkLabel() {
                 <div style={{ gridColumn: "1 / -1" }}>
                   <p style={{ fontSize: 8, color: "#8C8985", fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 2 }}>Defect Details</p>
                   <div style={{ 
-					display: "grid", 
-					gridTemplateColumns: "1fr 1fr", 
-					columnGap: 16,                  
-					rowGap: 0, 
-					alignItems: "start" 
-				  }}>
+                    display: "grid", 
+                    gridTemplateColumns: "1fr ", 
+                    columnGap: 4,                  
+                    rowGap: 0, 
+                    alignItems: "start" 
+                    }}>
                     {Array.from(panelDefects.entries()).map(([code, qty]) => {
                       const opt = defectOptions.find(d => d.defect_code === code);
                       return (
@@ -714,8 +714,9 @@ export function CreateReworkLabel() {
                   </div>
                 </div>
               )}
-
-			  <LabelField label="Remark" value={panelRemark} />
+              <div style={{ gridColumn: "1 / -1" }}>
+			         <LabelField label="Remark" value={panelRemark} />
+              </div>
               <LabelField label="QC Name" value={qcName || "–"} />
               <LabelField label="Date"    value={qcDate || "–"} />
               <LabelField label="Round"   value={`${panelRound}`} />
