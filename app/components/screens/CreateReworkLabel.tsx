@@ -23,6 +23,9 @@ const RET_COLS: { key: RetColKey; label: string; width: string; center?: boolean
 
 const RET_GRID = RET_COLS.map(c => c.width).join(" ") + " 110px 20px";
 
+// Physical receipt paper width. Change this if the roll isn't 74mm.
+const PRINT_WIDTH_MM = 74;
+
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 type SelectedLabel = ApiLabel | null;
@@ -71,6 +74,9 @@ export function CreateReworkLabel() {
   const [retDraft,   setRetDraft]   = useState<Set<string>>(new Set());
   const [retSearch,  setRetSearch]  = useState("");
   const retTableRef = useRef<HTMLDivElement>(null);
+
+  // ── Print area ref — used to grab the label markup and print it in its own window ──
+  const printRef = useRef<HTMLDivElement>(null);
 
   const router = useRouter();
 
@@ -153,7 +159,7 @@ export function CreateReworkLabel() {
   const newFailed   = total && passed ? Math.max(0, Number(total) - Number(passed)) : null;
   const riFailed    = selected && riPassed ? Math.max(0, selected.input_qty - Number(riPassed)) : null;
   const allPassed   = riFailed === 0;
-  
+
   const hasFailures = riFailed !== null && riFailed > 0;
 
   // Right panel display values
@@ -300,6 +306,46 @@ export function CreateReworkLabel() {
       console.error("handleConfirm error:", err);
       // TODO: replace with toast
     }
+  }
+
+  // ── Print handler ─────────────────────────────────────────────────────────────
+  // Opens a dedicated, bare window containing ONLY the label markup and prints
+  // from there. This avoids fighting the app's own layout/modal (which uses
+  // position: fixed) for @page sizing — the print window's document IS the
+  // page, so @page size/margin apply cleanly with no interference.
+  function handlePrint() {
+    const content = printRef.current?.innerHTML;
+    if (!content) return;
+
+    const printWindow = window.open("", "_blank", "width=400,height=600");
+    if (!printWindow) {
+      alert("ไม่สามารถเปิดหน้าต่างพิมพ์ได้ กรุณาอนุญาต pop-up สำหรับเว็บไซต์นี้");
+      return;
+    }
+
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta charset="utf-8" />
+          <title>Print Label</title>
+          <style>
+            @page { size: ${PRINT_WIDTH_MM}mm auto; margin: 0; }
+            * { box-sizing: border-box; }
+            html, body { margin: 0; padding: 0; width: ${PRINT_WIDTH_MM}mm; }
+            body { padding: 8px; font-family: Inter, Arial, sans-serif; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+          </style>
+        </head>
+        <body>${content}</body>
+      </html>
+    `);
+    printWindow.document.close();
+
+    printWindow.onload = () => {
+      printWindow.focus();
+      printWindow.print();
+    };
+    printWindow.onafterprint = () => printWindow.close();
   }
 
   // ── Render ───────────────────────────────────────────────────────────────────
@@ -651,7 +697,7 @@ export function CreateReworkLabel() {
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
             <p style={{ fontSize: 13, fontWeight: 600, color: "#000000" }}>Print Preview</p>
             <div style={{ display: "flex", gap: 8 }}>
-              <button onClick={() => window.print()} style={{ height: 32, padding: "0 14px", background: "#8DBAED", border: "none", borderRadius: 8, fontSize: 12, fontWeight: 600, color: "#fff", cursor: "pointer", fontFamily: "Inter, sans-serif", display: "flex", alignItems: "center", gap: 6 }}>
+              <button onClick={handlePrint} style={{ height: 32, padding: "0 14px", background: "#8DBAED", border: "none", borderRadius: 8, fontSize: 12, fontWeight: 600, color: "#fff", cursor: "pointer", fontFamily: "Inter, sans-serif", display: "flex", alignItems: "center", gap: 6 }}>
                 <Printer size={13} /> Print
               </button>
               <button onClick={() => setShowPrint(false)} style={{ width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center", background: "#fff", border: "0.5px solid #E5E7EB", borderRadius: 8, cursor: "pointer", color: "#8C8985" }}>
@@ -661,7 +707,7 @@ export function CreateReworkLabel() {
           </div>
 
           {/* label */}
-          <div id="print-area" style={{ width: "100%", margin: "0 auto", background: "#fff", padding: 16, boxSizing: "border-box", fontFamily: "Inter, sans-serif" }}>
+          <div id="print-area" ref={printRef} style={{ width: "100%", margin: "0 auto", background: "#fff", padding: 16, boxSizing: "border-box", fontFamily: "Inter, sans-serif" }}>
             <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 16, paddingBottom: 12, borderBottom: "1.5px solid #000000" }}>
               <div>
                 <p style={{ fontSize: 12, fontWeight: 600, color: "#8C8985", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 2 }}>REWORK LABEL</p>
