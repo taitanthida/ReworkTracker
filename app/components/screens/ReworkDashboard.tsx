@@ -37,6 +37,9 @@ type GroupFilters = Partial<Record<GroupColKey, Set<string>>>;
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
+// Physical receipt paper width used by the "reprint" print window below.
+const PRINT_WIDTH_MM = 57;
+
 const STATUS_CHIP: Record<Status, { label: string; bg: string; color: string }> = {
   ISSUED:      { label: "Issued",      bg: "#FEE2E2", color: "#991B1B" },
   IN_PROGRESS: { label: "In Progress", bg: "#FEF3C7", color: "#92400E" },
@@ -204,8 +207,14 @@ function LogCell({ children, center, muted, green, red }: {
   );
 }
 
+// Small labeled value used inside the printed receipt label.
 function LabelFieldD({ label, value }: { label: string; value: string }) {
-return <div><p style={{ fontSize: 9, color: "#8C8985", fontWeight: 600, letterSpacing: "0.05em", textTransform: "uppercase", marginBottom: 2 }}>{label}</p><p style={{ fontSize: 12, fontWeight: 600, color: "#000000" }}>{value}</p></div>;
+  return (
+    <div>
+      <p style={{ fontSize: 9, color: "#8C8985", fontWeight: 600, letterSpacing: "0.05em", textTransform: "uppercase", marginBottom: 2 }}>{label}</p>
+      <p style={{ fontSize: 12, fontWeight: 600, color: "#000000" }}>{value}</p>
+    </div>
+  );
 }
 
 // ── Main component ────────────────────────────────────────────────────────────
@@ -238,13 +247,15 @@ export function ReworkDashboard() {
   const [draft,          setDraft]          = useState<Set<string>>(new Set());
   const [colSearch,      setColSearch]      = useState("");
   const [searchText,     setSearchText]     = useState("");
-  const [quickStatus,    setQuickStatus] = useState<Set<Status | "ALL">>(new Set(["ALL"]));
-  const [printLabel,     setPrintLabel] = useState<ApiLabel | null>(null);
+  const [quickStatus,    setQuickStatus]    = useState<Set<Status | "ALL">>(new Set(["ALL"]));
+  const [printLabel,     setPrintLabel]     = useState<ApiLabel | null>(null);
   const [showLog,        setShowLog]        = useState(false);
   const tableRef = useRef<HTMLDivElement>(null);
   const router   = useRouter();
   const [defectOptions, setDefectOptions] = useState<DefectCode[]>([]);
 
+  // Print area ref — used to grab the label markup and print it in its own window
+  const printRef = useRef<HTMLDivElement>(null);
 
   // Close filter dropdown on outside click
   useEffect(() => {
@@ -256,7 +267,7 @@ export function ReworkDashboard() {
   }, []);
 
   useEffect(() => {
-  fetchDefectCodes().then(setDefectOptions).catch(console.error);
+    fetchDefectCodes().then(setDefectOptions).catch(console.error);
   }, []);
 
   // ── Expand/collapse handlers ─────────────────────────────────────────────────
@@ -313,27 +324,64 @@ export function ReworkDashboard() {
   // ── Derived filter state ─────────────────────────────────────────────────────
 
   const filteredGroups = orderGroups.filter(row => {
-  const matchesColFilters = (Object.entries(filters) as [GroupColKey, Set<string>][]).every(([col, allowed]) => allowed.has(String(row[col] ?? "")));
-  const matchesQuickStatus = quickStatus.has("ALL") || quickStatus.has(row.latestStatus);
-  const q = searchText.trim().toLowerCase();
-  const matchesSearch = !q || 
-  [row.orderId, row.materialId, row.description].some(v => String(v ?? "").toLowerCase().includes(q)) ||
-  row.labels.some(lbl => 
-    lbl.label_id.toLowerCase().includes(q) ||
-    (lbl.line_post ?? "").toLowerCase().includes(q) ||
-    (lbl.remark ?? "").toLowerCase().includes(q) ||
-    lbl.defect_codes.some(code => 
-      code.toLowerCase().includes(q) ||
-      (defectOptions.find(d => d.defect_code === code)?.description_th ?? "").toLowerCase().includes(q)) ||
-    (lbl.qc_name ?? "").toLowerCase().includes(q)
-  );
+    const matchesColFilters  = (Object.entries(filters) as [GroupColKey, Set<string>][]).every(([col, allowed]) => allowed.has(String(row[col] ?? "")));
+    const matchesQuickStatus = quickStatus.has("ALL") || quickStatus.has(row.latestStatus);
+    const q = searchText.trim().toLowerCase();
+    const matchesSearch = !q ||
+      [row.orderId, row.materialId, row.description].some(v => String(v ?? "").toLowerCase().includes(q)) ||
+      row.labels.some(lbl =>
+        lbl.label_id.toLowerCase().includes(q) ||
+        (lbl.line_post ?? "").toLowerCase().includes(q) ||
+        (lbl.remark ?? "").toLowerCase().includes(q) ||
+        lbl.defect_codes.some(code =>
+          code.toLowerCase().includes(q) ||
+          (defectOptions.find(d => d.defect_code === code)?.description_th ?? "").toLowerCase().includes(q)) ||
+        (lbl.qc_name ?? "").toLowerCase().includes(q)
+      );
 
-  return matchesColFilters && matchesQuickStatus && matchesSearch;
+    return matchesColFilters && matchesQuickStatus && matchesSearch;
   });
 
   const isFilterActive = (col: GroupColKey) => !!filters[col];
   const hasFilters = Object.keys(filters).length > 0 || searchText.trim() !== "" || !quickStatus.has("ALL");
 
+  // ── Print handler ─────────────────────────────────────────────────────────────
+  // Opens a dedicated, bare window containing ONLY the label markup and prints
+  // from there — avoids fighting this page's own layout/modal for @page sizing.
+  function handlePrint() {
+    const content = printRef.current?.innerHTML;
+    if (!content) return;
+
+    const printWindow = window.open("", "_blank", "width=400,height=600");
+    if (!printWindow) {
+      alert("ไม่สามารถเปิดหน้าต่างพิมพ์ได้ กรุณาอนุญาต pop-up สำหรับเว็บไซต์นี้");
+      return;
+    }
+
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta charset="utf-8" />
+          <title>Print Label</title>
+          <style>
+            @page { size: ${PRINT_WIDTH_MM}mm auto; margin: 0; }
+            * { box-sizing: border-box; }
+            html, body { margin: 0; padding: 0; width: ${PRINT_WIDTH_MM}mm; }
+            body { padding: 8px; font-family: Inter, Arial, sans-serif; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+          </style>
+        </head>
+        <body>${content}</body>
+      </html>
+    `);
+    printWindow.document.close();
+
+    printWindow.onload = () => {
+      printWindow.focus();
+      printWindow.print();
+    };
+    printWindow.onafterprint = () => printWindow.close();
+  }
 
   // ── Render ───────────────────────────────────────────────────────────────────
 
@@ -374,7 +422,7 @@ export function ReworkDashboard() {
               )}
             </div>
           </div>
-          
+
           {/* Search + quick status filters */}
           <div style={{ padding: "12px 20px", borderBottom: "0.5px solid #E5E7EB", display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
             <input
@@ -583,6 +631,7 @@ export function ReworkDashboard() {
           })}
         </div>
 
+        {/* ── Print Preview Modal (reprint from dashboard) ── */}
         {printLabel && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 300, display: "flex", alignItems: "center", justifyContent: "center" }}>
           <div style={{ background: "#F0EEE4", borderRadius: 12, padding: 24, maxHeight: "90vh", overflowY: "auto", width: 500 }}>
@@ -592,78 +641,76 @@ export function ReworkDashboard() {
                 <button onClick={handlePrint} style={{ height: 32, padding: "0 14px", background: "#8DBAED", border: "none", borderRadius: 8, fontSize: 12, fontWeight: 600, color: "#fff", cursor: "pointer", fontFamily: "Inter, sans-serif", display: "flex", alignItems: "center", gap: 6 }}>
                   <Printer size={13} /> Print
                 </button>
-                <button onClick={() => setShowPrint(false)} style={{ width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center", background: "#fff", border: "0.5px solid #E5E7EB", borderRadius: 8, cursor: "pointer", color: "#8C8985" }}>
+                <button onClick={() => setPrintLabel(null)} style={{ width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center", background: "#fff", border: "0.5px solid #E5E7EB", borderRadius: 8, cursor: "pointer", color: "#8C8985" }}>
                   <X size={14} />
                 </button>
               </div>
             </div>
-  
+
             {/* label */}
             <div id="print-area" ref={printRef} style={{ width: "57mm", maxWidth: "57mm", minWidth: "57mm", margin: "0 auto", background: "#fff", padding: "8px 6px", boxSizing: "border-box", fontFamily: "Inter, sans-serif" }}>
               <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 8, paddingBottom: 6, borderBottom: "1.5px solid #000000" }}>
                 <div>
                   <p style={{ fontSize: 9, fontWeight: 600, color: "#000000", letterSpacing: "0.04em", textTransform: "uppercase", margin: 0 }}>REWORK LABEL</p>
-                  <p style={{ fontSize: 14, fontWeight: 700, color: "#000000", letterSpacing: "0.01em", margin: 0, lineHeight: 1.2 }}>{panelId ?? "–"}</p>
+                  <p style={{ fontSize: 14, fontWeight: 700, color: "#000000", letterSpacing: "0.01em", margin: 0, lineHeight: 1.2 }}>{printLabel.label_id}</p>
                 </div>
                 <div style={{ textAlign: "right", display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 2 }}>
                   <span style={{ color: "#000000", fontSize: 8, fontWeight: 600, whiteSpace: "nowrap" }}>
-                    LINE · {panelLinePost || "–"}
+                    LINE · {printLabel.line_post || "–"}
                   </span>
                   <span style={{ fontSize: 8, fontWeight: 600, color: "#000000", whiteSpace: "nowrap" }}>
-                    PACK WK · {panelPackWk || "–"}
+                    PACK WK · {printLabel.pack_wk || "–"}
                   </span>
                 </div>
               </div>
-              
+
               <p style={{ fontSize: 9, color: "#000000", marginBottom: 8, lineHeight: 1.3, fontWeight: 600, wordBreak: "break-word" }}>
-                {(isReturned ? selected!.material_id : info?.materialId) ? `${isReturned ? selected!.material_id : info?.materialId} · ` : ""}{panelDesc ?? "–"}
+                {printLabel.material_id ? `${printLabel.material_id} · ` : ""}{printLabel.description ?? "–"}
               </p>
-  
+
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "6px 8px", marginBottom: 8 }}>
-                <LabelField label="Order No."   value={isReturned ? selected!.order_id : (orderNo || "–")} />
-                <LabelField label="Material ID" value={isReturned ? (selected!.material_id ?? "-") : (info?.materialId ?? "-")} />
-                <LabelField label="Line Post"   value={isReturned ? (selected!.line_post ?? "–") : (info?.linePost ?? "–")} />
-                <LabelField label="Prog Plan"   value={panelProgPlan || "–"} />
-                <LabelField label="QC After P"  value={panelQcAfterP || "–"} />
+                <LabelFieldD label="Order No."   value={printLabel.order_id} />
+                <LabelFieldD label="Material ID" value={printLabel.material_id ?? "-"} />
+                <LabelFieldD label="Line Post"   value={printLabel.line_post ?? "–"} />
+                <LabelFieldD label="Prog Plan"   value={printLabel.prog_plan || "–"} />
+                <LabelFieldD label="QC After P"  value={printLabel.qc_after_p || "–"} />
                 <div>
                   <p style={{ fontSize: 7, color: "#000000", fontWeight: 600, letterSpacing: "0.03em", textTransform: "uppercase", marginBottom: 8 }}>RW QTY</p>
-                  <p style={{ fontSize: 20, fontWeight: 700, color: "#000000", margin: 0, lineHeight: 1.1 }}>{panelFailed !== null ? String(panelFailed) : "–"}</p>
+                  <p style={{ fontSize: 20, fontWeight: 700, color: "#000000", margin: 0, lineHeight: 1.1 }}>{printLabel.input_qty}</p>
                 </div>
-  
-                {panelDefects.size > 0 && (
+
+                {printLabel.defect_codes.length > 0 && (
                   <div style={{ gridColumn: "1 / -1" }}>
                     <p style={{ fontSize: 7, color: "#000000", fontWeight: 600, letterSpacing: "0.04em", textTransform: "uppercase", marginBottom: 4 }}>Defect Details</p>
                     <div style={{ border: "0.5px solid #E5E7EB", borderRadius: 4, overflow: "hidden" }}>
-                      {Array.from(panelDefects.entries()).map(([code, qty]) => {
+                      {printLabel.defect_codes.map(code => {
                         const opt = defectOptions.find(d => d.defect_code === code);
                         return (
-                          <div key={code} style={{ display: "grid", gridTemplateColumns: "30px 1fr 20px", padding: "3px 4px", gap: 4, borderTop: "0.5px solid #E5E7EB", alignItems: "center" }}>
+                          <div key={code} style={{ display: "grid", gridTemplateColumns: "30px 1fr", padding: "3px 4px", gap: 4, borderTop: "0.5px solid #E5E7EB", alignItems: "center" }}>
                             <span style={{ fontSize: 10, fontWeight: 600, color: "#000000" }}>{code}</span>
                             <span style={{ fontSize: 9, color: "#000000", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{opt?.description_th ?? "–"}</span>
-                            <span style={{ fontSize: 10, fontWeight: 600, color: "#000000", textAlign: "center" }}>{qty}</span>
                           </div>
                         );
                       })}
                     </div>
                   </div>
                 )}
-  
-                {panelRemark && (
+
+                {printLabel.remark && (
                   <div style={{ gridColumn: "1 / -1" }}>
-                    <LabelField label="Remark" value={panelRemark} />
+                    <LabelFieldD label="Remark" value={printLabel.remark} />
                   </div>
                 )}
-  
-                <LabelField label="QC Name" value={qcName || "–"} />
-                <LabelField label="Date"    value={qcDate || "–"} />
-                <LabelField label="Round"   value={`${panelRound}`} />
-  
+
+                <LabelFieldD label="QC Name" value={printLabel.qc_name || "–"} />
+                <LabelFieldD label="Date"    value={formatDateFromISO(printLabel.issued_at) || "–"} />
+                <LabelFieldD label="Round"   value={`${printLabel.round_no}`} />
+
                 <div style={{ gridColumn: "1 / -1", paddingTop: "30mm", textAlign: "center" }}>
                   <p style={{ fontSize: 7, fontWeight: 600, color: "#000000", margin: 0, letterSpacing: "0.05em" }}>
                     --- END OF LABEL ---
                   </p>
                 </div>
-  
               </div>
             </div>
           </div>
@@ -704,7 +751,7 @@ export function ReworkDashboard() {
                     <LogCell>{row.date}</LogCell>
                     <LogCell>{row.order}</LogCell>
                     <LogCell>{row.description ?? "–"}</LogCell>
-                    <LogCell center>{row.linePost  ?? "–"}</LogCell> 
+                    <LogCell center>{row.linePost  ?? "–"}</LogCell>
                     <LogCell center>{row.progPlan  ?? "–"}</LogCell>
                     <LogCell center>{row.qcAfterP  ?? "–"}</LogCell>
                     <LogCell center>{row.total     ?? "–"}</LogCell>
@@ -720,7 +767,6 @@ export function ReworkDashboard() {
           )}
         </div>
 
-        
       </div>
     </div>
   );

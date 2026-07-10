@@ -23,7 +23,7 @@ const RET_COLS: { key: RetColKey; label: string; width: string; center?: boolean
 
 const RET_GRID = RET_COLS.map(c => c.width).join(" ") + " 110px 20px";
 
-// Physical receipt paper width. Change this if the roll isn't 74mm.
+// Physical receipt paper width
 const PRINT_WIDTH_MM = 57;
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -165,7 +165,7 @@ export function CreateReworkLabel() {
   // Right panel display values
   // prog_plan / qc_after_p / pack_wk / line_post are order-level, synced from production_orders
   // (ERP) — read-only, same value regardless of round.
-  const panelId      = isReturned ? selected!.label_id     : previewLabelId;
+  const panelId      = isReturned ? (hasFailures ? previewLabelId : selected!.label_id) : previewLabelId;
   const panelDesc    = isReturned ? selected!.description  : (info?.description ?? null);
   const panelQty     = isReturned ? selected!.input_qty    : (total ? Number(total) : null);
   const panelRound   = isReturned ? selected!.round_no + 1 : 1;
