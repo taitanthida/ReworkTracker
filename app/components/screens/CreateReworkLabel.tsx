@@ -24,7 +24,7 @@ const RET_COLS: { key: RetColKey; label: string; width: string; center?: boolean
 const RET_GRID = RET_COLS.map(c => c.width).join(" ") + " 110px 20px";
 
 // Physical receipt paper width. Change this if the roll isn't 74mm.
-const PRINT_WIDTH_MM = 74;
+const PRINT_WIDTH_MM = 57;
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -330,10 +330,35 @@ export function CreateReworkLabel() {
           <meta charset="utf-8" />
           <title>Print Label</title>
           <style>
-            @page { size: ${PRINT_WIDTH_MM}mm auto; margin: 0; }
+            @page { 
+              size: ${PRINT_WIDTH_MM}mm auto; 
+              margin: 0; 
+            }
             * { box-sizing: border-box; }
-            html, body { margin: 0; padding: 0; width: ${PRINT_WIDTH_MM}mm; }
-            body { padding: 8px; font-family: Inter, Arial, sans-serif; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            
+            /* 🛠️ แก้ไขจุดนี้: ปรับตัว html และ body ให้ขยับหลบขอบซ้ายที่โดนกิน */
+            html, body { 
+              margin: 0; 
+              padding: 0; 
+              background: #fff;
+            }
+            
+            body { 
+              /* ดันขอบซ้ายเข้ามา 4mm เพื่อหนีโซนบอดของหัวพิมพ์ที่ตัดตัวหนังสือแหว่ง */
+              padding: 6px 2px 6px 6mm; 
+              
+              /* บีบหน้ากว้างเนื้อหาจริงให้เหลือแคบกว่าหน้ากระดาษนิดหน่อย (เช่น ถ้ากระดาษ 57mm เนื้อหาจะวิ่งอยู่ที่ ~51mm) */
+              width: calc(${PRINT_WIDTH_MM}mm - 2mm); 
+              
+              font-family: Inter, Arial, sans-serif; 
+              -webkit-print-color-adjust: exact; 
+              print-color-adjust: exact; 
+            }
+
+            /* บังคับให้ตารางและดีฟล็อกข้างในทั้งหมดกางเต็มพอดีกรอบ body ใหม่ ไม่ให้โย้ล้นไปทางขวา */
+            body * {
+              max-width: 100% !important;
+            }
           </style>
         </head>
         <body>${content}</body>
@@ -706,60 +731,84 @@ export function CreateReworkLabel() {
             </div>
           </div>
 
-          {/* label */}
-          <div id="print-area" ref={printRef} style={{ width: "100%", margin: "0 auto", background: "#fff", padding: 16, boxSizing: "border-box", fontFamily: "Inter, sans-serif" }}>
-            <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 16, paddingBottom: 12, borderBottom: "1.5px solid #000000" }}>
+          {/* label - ปรับโครงสร้างรองรับ 57mm ทั้งบนหน้าจอและตอนพิมพ์ */}
+          <div id="print-area" ref={printRef} style={{ width: "57mm", maxWidth: "57mm", minWidth: "57mm", margin: "0 auto", background: "#fff", padding: "8px 6px", boxSizing: "border-box", fontFamily: "Inter, sans-serif" }}>
+            <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 8, paddingBottom: 6, borderBottom: "1.5px solid #000000" }}>
               <div>
-                <p style={{ fontSize: 12, fontWeight: 600, color: "#8C8985", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 2 }}>REWORK LABEL</p>
-                <p style={{ fontSize: 20, fontWeight: 700, color: "#000000", letterSpacing: "0.02em" }}>{panelId ?? "–"}</p>
+                <p style={{ fontSize: 8, fontWeight: 600, color: "#000000", letterSpacing: "0.04em", textTransform: "uppercase", margin: 0 }}>REWORK LABEL</p>
+                <p style={{ fontSize: 12, fontWeight: 700, color: "#000000", letterSpacing: "0.01em", margin: 0, lineHeight: 1.2 }}>{panelId ?? "–"}</p>
               </div>
-              <div style={{ textAlign: "right", display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
-                <span style={{ padding: "3px 12px", borderRadius: 999, color: "#000000", fontSize: 12, fontWeight: 600 }}>
+              <div style={{ textAlign: "right", display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 2 }}>
+                <span style={{ color: "#000000", fontSize: 8, fontWeight: 600, whiteSpace: "nowrap" }}>
                   LINE · {panelLinePost || "–"}
                 </span>
-                <span style={{ padding: "3px 12px", borderRadius: 999, fontSize: 12, fontWeight: 600, color: "#000000" }}>
+                <span style={{ fontSize: 8, fontWeight: 600, color: "#000000", whiteSpace: "nowrap" }}>
                   PACK WK · {panelPackWk || "–"}
                 </span>
               </div>
             </div>
-            <p style={{ fontSize: 12, color: "#000000", marginBottom: 14, lineHeight: 1.4 }}>
+            
+            <p style={{ fontSize: 8, color: "#000000", marginBottom: 8, lineHeight: 1.3, fontWeight: 500, wordBreak: "break-word" }}>
               {(isReturned ? selected!.material_id : info?.materialId) ? `${isReturned ? selected!.material_id : info?.materialId} · ` : ""}{panelDesc ?? "–"}
             </p>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "10px 20px", marginBottom: 14 }}>
+
+            {/* ปรับ Grid Gap ให้แคบลงเพื่อให้พอดีกระดาษ 57mm */}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "6px 8px", marginBottom: 8 }}>
               <LabelField label="Order No."   value={isReturned ? selected!.order_id : (orderNo || "–")} />
               <LabelField label="Material ID" value={isReturned ? (selected!.material_id ?? "-") : (info?.materialId ?? "-")} />
               <LabelField label="Line Post"   value={isReturned ? (selected!.line_post ?? "–") : (info?.linePost ?? "–")} />
               <LabelField label="Prog Plan"   value={panelProgPlan || "–"} />
               <LabelField label="QC After P"  value={panelQcAfterP || "–"} />
               <div>
-                <p style={{ fontSize: 9, color: "#8C8985", fontWeight: 600, letterSpacing: "0.05em", textTransform: "uppercase", marginBottom: 2 }}>RW QTY</p>
-                <p style={{ fontSize: 20, fontWeight: 700, color: "#DC2626" }}>{panelFailed !== null ? String(panelFailed) : "–"}</p>
+                <p style={{ fontSize: 7, color: "#000000", fontWeight: 600, letterSpacing: "0.03em", textTransform: "uppercase", marginBottom: 8 }}>RW QTY</p>
+                <p style={{ fontSize: 20, fontWeight: 700, color: "#000000", margin: 0, lineHeight: 1.1 }}>{panelFailed !== null ? String(panelFailed) : "–"}</p>
               </div>
+
               {panelDefects.size > 0 && (
                 <div style={{ gridColumn: "1 / -1" }}>
-                  <p style={{ fontSize: 9, color: "#8C8985", fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 6 }}>Defect Details</p>
-                  <div style={{ border: "0.5px solid #E5E7EB", borderRadius: 6, overflow: "hidden" }}>
+                  <p style={{ fontSize: 7, color: "#000000", fontWeight: 600, letterSpacing: "0.04em", textTransform: "uppercase", marginBottom: 4 }}>Defect Details</p>
+                  <div style={{ border: "0.5px solid #E5E7EB", borderRadius: 4, overflow: "hidden" }}>
                     {Array.from(panelDefects.entries()).map(([code, qty]) => {
                       const opt = defectOptions.find(d => d.defect_code === code);
                       return (
-                        <div key={code} style={{ display: "grid", gridTemplateColumns: "70px 1fr 40px", padding: "4px 8px", gap: 8, borderTop: "0.5px solid #E5E7EB", alignItems: "center" }}>
-                          <span style={{ fontSize: 12, fontWeight: 600, color: "#000000" }}>{code}</span>
-                          <span style={{ fontSize: 12, color: "#000000" }}>{opt?.description_th ?? "–"}</span>
-                          <span style={{ fontSize: 12, fontWeight: 600, color: "#000000", textAlign: "center" }}>{qty}</span>
+                        /* บีบสัดส่วนคอลัมน์ Defect และปรับฟอนต์เหลือ 9px เพื่อไม่ให้ล้นข้อความทับกัน */
+                        <div key={code} style={{ display: "grid", gridTemplateColumns: "45px 1fr 20px", padding: "3px 4px", gap: 4, borderTop: "0.5px solid #E5E7EB", alignItems: "center" }}>
+                          <span style={{ fontSize: 9, fontWeight: 600, color: "#000000" }}>{code}</span>
+                          <span style={{ fontSize: 9, color: "#000000", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{opt?.description_th ?? "–"}</span>
+                          <span style={{ fontSize: 9, fontWeight: 600, color: "#000000", textAlign: "center" }}>{qty}</span>
                         </div>
                       );
                     })}
                   </div>
                 </div>
               )}
+
               {panelRemark && (
                 <div style={{ gridColumn: "1 / -1" }}>
                   <LabelField label="Remark" value={panelRemark} />
                 </div>
               )}
+
               <LabelField label="QC Name" value={qcName || "–"} />
               <LabelField label="Date"    value={qcDate || "–"} />
               <LabelField label="Round"   value={`${panelRound}`} />
+
+              <div style={{ 
+                gridColumn: "1 / -1", 
+                paddingTop: "30mm",         
+                textAlign: "center" 
+              }}>
+                <p style={{ 
+                  fontSize: 7, 
+                  fontWeight: 600, 
+                  color: "#000000", 
+                  margin: 0,
+                  letterSpacing: "0.05em"
+                }}>
+                  --- END OF LABEL ---
+                </p>
+              </div>
+              
             </div>
           </div>
         </div>
@@ -880,7 +929,7 @@ function SummaryField({ label, value, color }: { label: string; value: string; c
   return <div><p style={{ fontSize: 10, color: "#8C8985", marginBottom: 2, textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 600 }}>{label}</p><p style={{ fontSize: 14, fontWeight: 600, color: color ?? "#000000" }}>{value}</p></div>;
 }
 function LabelField({ label, value }: { label: string; value: string }) {
-  return <div><p style={{ fontSize: 9, color: "#8C8985", fontWeight: 600, letterSpacing: "0.05em", textTransform: "uppercase", marginBottom: 2 }}>{label}</p><p style={{ fontSize: 12, fontWeight: 600, color: "#000000" }}>{value}</p></div>;
+  return <div><p style={{ fontSize: 7, color: "#000000", fontWeight: 600, letterSpacing: "0.05em", textTransform: "uppercase", marginBottom: 2 }}>{label}</p><p style={{ fontSize: 9, fontWeight: 600, color: "#000000" }}>{value}</p></div>;
 }
 function NumberField({ label, value, onChange, readOnly = false, bg, labelColor = "#000000" }: {
   label: string; value: string; onChange?: (v: string) => void; readOnly?: boolean; bg: string; labelColor?: string;
