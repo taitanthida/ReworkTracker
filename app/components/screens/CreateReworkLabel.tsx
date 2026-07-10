@@ -336,7 +336,7 @@ export function CreateReworkLabel() {
             }
             * { box-sizing: border-box; }
             
-            /* 🛠️ แก้ไขจุดนี้: ปรับตัว html และ body ให้ขยับหลบขอบซ้ายที่โดนกิน */
+            /* ปรับตัว html และ body ให้ขยับหลบขอบซ้ายที่โดนกิน */
             html, body { 
               margin: 0; 
               padding: 0; 
@@ -344,10 +344,10 @@ export function CreateReworkLabel() {
             }
             
             body { 
-              /* ดันขอบซ้ายเข้ามา 4mm เพื่อหนีโซนบอดของหัวพิมพ์ที่ตัดตัวหนังสือแหว่ง */
+              /* ดันขอบซ้ายเข้ามา เพื่อหนีโซนบอดของหัวพิมพ์ที่ตัดตัวหนังสือแหว่ง */
               padding: 6px 2px 6px 6mm; 
               
-              /* บีบหน้ากว้างเนื้อหาจริงให้เหลือแคบกว่าหน้ากระดาษนิดหน่อย (เช่น ถ้ากระดาษ 57mm เนื้อหาจะวิ่งอยู่ที่ ~51mm) */
+              /* บีบหน้ากว้างเนื้อหาจริงให้เหลือแคบกว่าหน้ากระดาษนิดหน่อย (ถ้ากระดาษ 57mm เนื้อหาจะวิ่งอยู่ที่ ~51mm) */
               width: calc(${PRINT_WIDTH_MM}mm - 2mm); 
               
               font-family: Inter, Arial, sans-serif; 
@@ -566,7 +566,7 @@ export function CreateReworkLabel() {
                 <div style={{ gridColumn: "1 / -1" }}>
                   <p style={{ fontSize: 11, color: "#8C8985", fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 6 }}>Defect Details</p>
                   <div style={{ border: "0.5px solid #E5E7EB", borderRadius: 6, overflow: "hidden" }}>
-                    <div style={{ display: "grid", gridTemplateColumns: "70px 1fr 40px", background: "#F0EEE4", padding: "3px 8px", gap: 8 }}>
+                    <div style={{ display: "grid", gridTemplateColumns: "50px 1fr 40px", background: "#F0EEE4", padding: "3px 8px", gap: 8 }}>
                       <span style={{ fontSize: 8, fontWeight: 600, color: "#8C8985", textTransform: "uppercase" }}>Code</span>
                       <span style={{ fontSize: 8, fontWeight: 600, color: "#8C8985", textTransform: "uppercase" }}>Description</span>
                       <span style={{ fontSize: 8, fontWeight: 600, color: "#8C8985", textTransform: "uppercase", textAlign: "center" }}>Qty</span>
@@ -574,7 +574,7 @@ export function CreateReworkLabel() {
                     {Array.from(panelDefects.entries()).map(([code, qty]) => {
                       const opt = defectOptions.find(d => d.defect_code === code);
                       return (
-                        <div key={code} style={{ display: "grid", gridTemplateColumns: "70px 1fr 40px", padding: "4px 8px", gap: 8, borderTop: "0.5px solid #E5E7EB", alignItems: "center" }}>
+                        <div key={code} style={{ display: "grid", gridTemplateColumns: "50px 1fr 40px", padding: "4px 8px", gap: 8, borderTop: "0.5px solid #E5E7EB", alignItems: "center" }}>
                           <span style={{ fontSize: 10, fontWeight: 600, color: "#000000" }}>{code}</span>
                           <span style={{ fontSize: 10, color: "#000000" }}>{opt?.description_th ?? "–"}</span>
                           <span style={{ fontSize: 10, fontWeight: 600, color: "#000000", textAlign: "center" }}>{qty}</span>
@@ -731,12 +731,12 @@ export function CreateReworkLabel() {
             </div>
           </div>
 
-          {/* label - ปรับโครงสร้างรองรับ 57mm ทั้งบนหน้าจอและตอนพิมพ์ */}
+          {/* label */}
           <div id="print-area" ref={printRef} style={{ width: "57mm", maxWidth: "57mm", minWidth: "57mm", margin: "0 auto", background: "#fff", padding: "8px 6px", boxSizing: "border-box", fontFamily: "Inter, sans-serif" }}>
             <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 8, paddingBottom: 6, borderBottom: "1.5px solid #000000" }}>
               <div>
-                <p style={{ fontSize: 8, fontWeight: 600, color: "#000000", letterSpacing: "0.04em", textTransform: "uppercase", margin: 0 }}>REWORK LABEL</p>
-                <p style={{ fontSize: 12, fontWeight: 700, color: "#000000", letterSpacing: "0.01em", margin: 0, lineHeight: 1.2 }}>{panelId ?? "–"}</p>
+                <p style={{ fontSize: 9, fontWeight: 600, color: "#000000", letterSpacing: "0.04em", textTransform: "uppercase", margin: 0 }}>REWORK LABEL</p>
+                <p style={{ fontSize: 14, fontWeight: 700, color: "#000000", letterSpacing: "0.01em", margin: 0, lineHeight: 1.2 }}>{panelId ?? "–"}</p>
               </div>
               <div style={{ textAlign: "right", display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 2 }}>
                 <span style={{ color: "#000000", fontSize: 8, fontWeight: 600, whiteSpace: "nowrap" }}>
@@ -748,11 +748,10 @@ export function CreateReworkLabel() {
               </div>
             </div>
             
-            <p style={{ fontSize: 8, color: "#000000", marginBottom: 8, lineHeight: 1.3, fontWeight: 500, wordBreak: "break-word" }}>
+            <p style={{ fontSize: 9, color: "#000000", marginBottom: 8, lineHeight: 1.3, fontWeight: 600, wordBreak: "break-word" }}>
               {(isReturned ? selected!.material_id : info?.materialId) ? `${isReturned ? selected!.material_id : info?.materialId} · ` : ""}{panelDesc ?? "–"}
             </p>
 
-            {/* ปรับ Grid Gap ให้แคบลงเพื่อให้พอดีกระดาษ 57mm */}
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "6px 8px", marginBottom: 8 }}>
               <LabelField label="Order No."   value={isReturned ? selected!.order_id : (orderNo || "–")} />
               <LabelField label="Material ID" value={isReturned ? (selected!.material_id ?? "-") : (info?.materialId ?? "-")} />
@@ -771,11 +770,10 @@ export function CreateReworkLabel() {
                     {Array.from(panelDefects.entries()).map(([code, qty]) => {
                       const opt = defectOptions.find(d => d.defect_code === code);
                       return (
-                        /* บีบสัดส่วนคอลัมน์ Defect และปรับฟอนต์เหลือ 9px เพื่อไม่ให้ล้นข้อความทับกัน */
-                        <div key={code} style={{ display: "grid", gridTemplateColumns: "45px 1fr 20px", padding: "3px 4px", gap: 4, borderTop: "0.5px solid #E5E7EB", alignItems: "center" }}>
-                          <span style={{ fontSize: 9, fontWeight: 600, color: "#000000" }}>{code}</span>
+                        <div key={code} style={{ display: "grid", gridTemplateColumns: "30px 1fr 20px", padding: "3px 4px", gap: 4, borderTop: "0.5px solid #E5E7EB", alignItems: "center" }}>
+                          <span style={{ fontSize: 10, fontWeight: 600, color: "#000000" }}>{code}</span>
                           <span style={{ fontSize: 9, color: "#000000", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{opt?.description_th ?? "–"}</span>
-                          <span style={{ fontSize: 9, fontWeight: 600, color: "#000000", textAlign: "center" }}>{qty}</span>
+                          <span style={{ fontSize: 10, fontWeight: 600, color: "#000000", textAlign: "center" }}>{qty}</span>
                         </div>
                       );
                     })}
@@ -793,22 +791,12 @@ export function CreateReworkLabel() {
               <LabelField label="Date"    value={qcDate || "–"} />
               <LabelField label="Round"   value={`${panelRound}`} />
 
-              <div style={{ 
-                gridColumn: "1 / -1", 
-                paddingTop: "30mm",         
-                textAlign: "center" 
-              }}>
-                <p style={{ 
-                  fontSize: 7, 
-                  fontWeight: 600, 
-                  color: "#000000", 
-                  margin: 0,
-                  letterSpacing: "0.05em"
-                }}>
+              <div style={{ gridColumn: "1 / -1", paddingTop: "30mm", textAlign: "center" }}>
+                <p style={{ fontSize: 7, fontWeight: 600, color: "#000000", margin: 0, letterSpacing: "0.05em" }}>
                   --- END OF LABEL ---
                 </p>
               </div>
-              
+
             </div>
           </div>
         </div>
@@ -844,7 +832,7 @@ function DefectDropdown({ selectedCodes, onToggle, onUpdateQty, searchVal, setSe
       {selectedCodes.size > 0 && (
         <div style={{ border: "0.5px solid #E5E7EB", borderRadius: 8, overflow: "hidden", marginBottom: 6 }}>
           {/* Header */}
-          <div style={{ display: "grid", gridTemplateColumns: "80px 1fr 60px 28px", background: "#F0EEE4", padding: "4px 10px", gap: 8 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "50px 1fr 40px 28px", background: "#F0EEE4", padding: "4px 10px", gap: 8 }}>
             <span style={{ fontSize: 10, fontWeight: 600, color: "#8C8985", textTransform: "uppercase" }}>Code</span>
             <span style={{ fontSize: 10, fontWeight: 600, color: "#8C8985", textTransform: "uppercase" }}>Description</span>
             <span style={{ fontSize: 10, fontWeight: 600, color: "#8C8985", textTransform: "uppercase", textAlign: "center" }}>Qty</span>
@@ -854,7 +842,7 @@ function DefectDropdown({ selectedCodes, onToggle, onUpdateQty, searchVal, setSe
           {Array.from(selectedCodes.entries()).map(([code, qty]) => {
             const opt = options.find(d => d.defect_code === code);
             return (
-              <div key={code} style={{ display: "grid", gridTemplateColumns: "80px 1fr 60px 28px", padding: "6px 10px", gap: 8, alignItems: "center", borderTop: "0.5px solid #E5E7EB" }}>
+              <div key={code} style={{ display: "grid", gridTemplateColumns: "50px 1fr 40px 28px", padding: "6px 10px", gap: 8, alignItems: "center", borderTop: "0.5px solid #E5E7EB" }}>
                 <span style={{ fontSize: 12, fontWeight: 600, color: "#000000" }}>{code}</span>
                 <span style={{ fontSize: 12, color: "#000000" }}>{opt?.description_th ?? ""}</span>
                 <input

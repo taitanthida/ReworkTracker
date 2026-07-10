@@ -583,6 +583,93 @@ export function ReworkDashboard() {
           })}
         </div>
 
+        {printLabel && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 300, display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <div style={{ background: "#F0EEE4", borderRadius: 12, padding: 24, maxHeight: "90vh", overflowY: "auto", width: 500 }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+              <p style={{ fontSize: 13, fontWeight: 600, color: "#000000" }}>Print Preview</p>
+              <div style={{ display: "flex", gap: 8 }}>
+                <button onClick={handlePrint} style={{ height: 32, padding: "0 14px", background: "#8DBAED", border: "none", borderRadius: 8, fontSize: 12, fontWeight: 600, color: "#fff", cursor: "pointer", fontFamily: "Inter, sans-serif", display: "flex", alignItems: "center", gap: 6 }}>
+                  <Printer size={13} /> Print
+                </button>
+                <button onClick={() => setShowPrint(false)} style={{ width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center", background: "#fff", border: "0.5px solid #E5E7EB", borderRadius: 8, cursor: "pointer", color: "#8C8985" }}>
+                  <X size={14} />
+                </button>
+              </div>
+            </div>
+  
+            {/* label */}
+            <div id="print-area" ref={printRef} style={{ width: "57mm", maxWidth: "57mm", minWidth: "57mm", margin: "0 auto", background: "#fff", padding: "8px 6px", boxSizing: "border-box", fontFamily: "Inter, sans-serif" }}>
+              <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 8, paddingBottom: 6, borderBottom: "1.5px solid #000000" }}>
+                <div>
+                  <p style={{ fontSize: 9, fontWeight: 600, color: "#000000", letterSpacing: "0.04em", textTransform: "uppercase", margin: 0 }}>REWORK LABEL</p>
+                  <p style={{ fontSize: 14, fontWeight: 700, color: "#000000", letterSpacing: "0.01em", margin: 0, lineHeight: 1.2 }}>{panelId ?? "–"}</p>
+                </div>
+                <div style={{ textAlign: "right", display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 2 }}>
+                  <span style={{ color: "#000000", fontSize: 8, fontWeight: 600, whiteSpace: "nowrap" }}>
+                    LINE · {panelLinePost || "–"}
+                  </span>
+                  <span style={{ fontSize: 8, fontWeight: 600, color: "#000000", whiteSpace: "nowrap" }}>
+                    PACK WK · {panelPackWk || "–"}
+                  </span>
+                </div>
+              </div>
+              
+              <p style={{ fontSize: 9, color: "#000000", marginBottom: 8, lineHeight: 1.3, fontWeight: 600, wordBreak: "break-word" }}>
+                {(isReturned ? selected!.material_id : info?.materialId) ? `${isReturned ? selected!.material_id : info?.materialId} · ` : ""}{panelDesc ?? "–"}
+              </p>
+  
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "6px 8px", marginBottom: 8 }}>
+                <LabelField label="Order No."   value={isReturned ? selected!.order_id : (orderNo || "–")} />
+                <LabelField label="Material ID" value={isReturned ? (selected!.material_id ?? "-") : (info?.materialId ?? "-")} />
+                <LabelField label="Line Post"   value={isReturned ? (selected!.line_post ?? "–") : (info?.linePost ?? "–")} />
+                <LabelField label="Prog Plan"   value={panelProgPlan || "–"} />
+                <LabelField label="QC After P"  value={panelQcAfterP || "–"} />
+                <div>
+                  <p style={{ fontSize: 7, color: "#000000", fontWeight: 600, letterSpacing: "0.03em", textTransform: "uppercase", marginBottom: 8 }}>RW QTY</p>
+                  <p style={{ fontSize: 20, fontWeight: 700, color: "#000000", margin: 0, lineHeight: 1.1 }}>{panelFailed !== null ? String(panelFailed) : "–"}</p>
+                </div>
+  
+                {panelDefects.size > 0 && (
+                  <div style={{ gridColumn: "1 / -1" }}>
+                    <p style={{ fontSize: 7, color: "#000000", fontWeight: 600, letterSpacing: "0.04em", textTransform: "uppercase", marginBottom: 4 }}>Defect Details</p>
+                    <div style={{ border: "0.5px solid #E5E7EB", borderRadius: 4, overflow: "hidden" }}>
+                      {Array.from(panelDefects.entries()).map(([code, qty]) => {
+                        const opt = defectOptions.find(d => d.defect_code === code);
+                        return (
+                          <div key={code} style={{ display: "grid", gridTemplateColumns: "30px 1fr 20px", padding: "3px 4px", gap: 4, borderTop: "0.5px solid #E5E7EB", alignItems: "center" }}>
+                            <span style={{ fontSize: 10, fontWeight: 600, color: "#000000" }}>{code}</span>
+                            <span style={{ fontSize: 9, color: "#000000", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{opt?.description_th ?? "–"}</span>
+                            <span style={{ fontSize: 10, fontWeight: 600, color: "#000000", textAlign: "center" }}>{qty}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+  
+                {panelRemark && (
+                  <div style={{ gridColumn: "1 / -1" }}>
+                    <LabelField label="Remark" value={panelRemark} />
+                  </div>
+                )}
+  
+                <LabelField label="QC Name" value={qcName || "–"} />
+                <LabelField label="Date"    value={qcDate || "–"} />
+                <LabelField label="Round"   value={`${panelRound}`} />
+  
+                <div style={{ gridColumn: "1 / -1", paddingTop: "30mm", textAlign: "center" }}>
+                  <p style={{ fontSize: 7, fontWeight: 600, color: "#000000", margin: 0, letterSpacing: "0.05em" }}>
+                    --- END OF LABEL ---
+                  </p>
+                </div>
+  
+              </div>
+            </div>
+          </div>
+        </div>
+        )}
+
         {/* ── Rework Log (toggle) ── */}
         <div>
           <button
@@ -633,80 +720,7 @@ export function ReworkDashboard() {
           )}
         </div>
 
-        {printLabel && (
-        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 300, display: "flex", alignItems: "center", justifyContent: "center" }}>
-          <div style={{ background: "#F0EEE4", borderRadius: 12, padding: 24, maxHeight: "90vh", overflowY: "auto", width: 500 }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
-              <p style={{ fontSize: 13, fontWeight: 600, color: "#000000" }}>Print Preview</p>
-              <div style={{ display: "flex", gap: 8 }}>
-                <button onClick={() => window.print()} style={{ height: 32, padding: "0 14px", background: "#8DBAED", border: "none", borderRadius: 8, fontSize: 12, fontWeight: 600, color: "#fff", cursor: "pointer", fontFamily: "Inter, sans-serif", display: "flex", alignItems: "center", gap: 6 }}>
-                  <Printer size={13} /> Print
-                </button>
-                <button onClick={() => setPrintLabel(null)} style={{ width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center", background: "#fff", border: "0.5px solid #E5E7EB", borderRadius: 8, cursor: "pointer", color: "#8C8985" }}>
-                  <X size={14} />
-                </button>
-              </div>
-            </div>
-
-            {/* label */}
-            <div id="print-area" style={{ width: "100%", margin: "0 auto", background: "#fff", padding: 16, boxSizing: "border-box", fontFamily: "Inter, sans-serif" }}>
-              <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 16, paddingBottom: 12, borderBottom: "1.5px solid #000000" }}>
-                <div>
-                  <p style={{ fontSize: 12, fontWeight: 600, color: "#8C8985", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 2 }}>REWORK LABEL</p>
-                  <p style={{ fontSize: 20, fontWeight: 700, color: "#000000", letterSpacing: "0.02em" }}>{printLabel.label_id}</p>
-                </div>
-                <div style={{ textAlign: "right", display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
-                  <span style={{ padding: "3px 12px", borderRadius: 999, color: "#000000", fontSize: 12, fontWeight: 600 }}>
-                    LINE · {printLabel.line_post || "–"}
-                  </span>
-                  <span style={{ padding: "3px 12px", borderRadius: 999, fontSize: 12, fontWeight: 600, color: "#000000" }}>
-                    PACK WK · {printLabel.pack_wk || "–"}
-                  </span>
-                </div>
-              </div>
-              <p style={{ fontSize: 12, color: "#000000", marginBottom: 14, lineHeight: 1.4 }}>
-                {printLabel.material_id ? `${printLabel.material_id} · ` : ""}{printLabel.description ?? "–"}
-              </p>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "10px 20px", marginBottom: 14 }}>
-                <LabelFieldD label="Order No."   value={printLabel.order_id} />
-                <LabelFieldD label="Material ID" value={printLabel.material_id ?? "-"} />
-                <LabelFieldD label="Line Post"   value={printLabel.line_post ?? "–"} />
-                <LabelFieldD label="Prog Plan"   value={printLabel.prog_plan ?? "–"} />
-                <LabelFieldD label="QC After P"  value={printLabel.qc_after_p ?? "–"} />
-                <div>
-                  <p style={{ fontSize: 9, color: "#8C8985", fontWeight: 600, letterSpacing: "0.05em", textTransform: "uppercase", marginBottom: 2 }}>RW QTY</p>
-                  <p style={{ fontSize: 20, fontWeight: 700, color: "#DC2626" }}>{printLabel.input_qty}</p>
-                </div>
-                {printLabel.defect_details.length > 0 && (
-                  <div style={{ gridColumn: "1 / -1" }}>
-                    <p style={{ fontSize: 9, color: "#8C8985", fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 6 }}>Defect Details</p>
-                    <div style={{ border: "0.5px solid #E5E7EB", borderRadius: 6, overflow: "hidden" }}>
-                      {printLabel.defect_details.map(({ code, qty }) => {
-                        const opt = defectOptions.find(d => d.defect_code === code);
-                        return (
-                          <div key={code} style={{ display: "grid", gridTemplateColumns: "70px 1fr 40px", padding: "4px 8px", gap: 8, borderTop: "0.5px solid #E5E7EB", alignItems: "center" }}>
-                            <span style={{ fontSize: 12, fontWeight: 600, color: "#000000" }}>{code}</span>
-                            <span style={{ fontSize: 12, color: "#000000" }}>{opt?.description_th ?? "–"}</span>
-                            <span style={{ fontSize: 12, fontWeight: 600, color: "#000000", textAlign: "center" }}>{qty}</span>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-                {printLabel.remark && (
-                  <div style={{ gridColumn: "1 / -1" }}>
-                    <LabelFieldD label="Remark" value={printLabel.remark} />
-                  </div>
-                )}
-                <LabelFieldD label="QC Name" value={printLabel.qc_name ?? "–"} />
-                <LabelFieldD label="Date"    value={formatDateFromISO(printLabel.issued_at) || "–"} />
-                <LabelFieldD label="Round"   value={`${printLabel.round_no}`} />
-              </div>
-            </div>
-          </div>
-        </div>
-        )}
+        
       </div>
     </div>
   );
