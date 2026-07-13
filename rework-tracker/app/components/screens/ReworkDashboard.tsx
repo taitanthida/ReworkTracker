@@ -2,7 +2,7 @@
 import { useState, useRef, useEffect, type CSSProperties, type ReactNode } from "react";
 import { ArrowLeft, ClipboardList, BadgeAlert, UserRoundCog, PackageSearch, XCircle, ChevronDown, ChevronRight, Download, Printer, X } from "lucide-react";
 import { useRouter } from "next/navigation"
-import { fetchAllLabels, formatDateFromISO, fetchDefectCodes, type ApiLabel, type DefectCode } from "../../lib/api"
+import { fetchAllLabels, formatDateFromISO, fetchDefectCodes, type ApiLabel, type DefectCode } from "../../../services/reworkApi"
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 

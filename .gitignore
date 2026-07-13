@@ -1,4 +1,5 @@
-.next/
-node_modules/
-rework-api/node_modules/
-rework-api/.env
+rework-tracker/.next/
+rework-tracker/node_modules/
+.env
+.env.*
+.DS_Store

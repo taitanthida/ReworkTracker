@@ -3,7 +3,7 @@ import { useState, useRef, useEffect, type CSSProperties, type ReactNode } from 
 import { ArrowLeft, Search, Send, Check, Printer, ChevronDown, X } from "lucide-react";
 import { useRouter } from "next/navigation"
 import { fetchReturnedLabels, fetchOrderInfoNormalized, generateLabelId, createLabel, updateLabel, formatDate,
-  formatDateFromISO, fetchDefectCodes, fetchUsers, type ApiLabel, type OrderInfo, type DefectCode, type User } from "../../lib/api"
+  formatDateFromISO, fetchDefectCodes, fetchUsers, type ApiLabel, type OrderInfo, type DefectCode, type User } from "../../../services/reworkApi"
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -817,7 +817,7 @@ function DefectDropdown({ selectedCodes, onToggle, onUpdateQty, searchVal, setSe
   isOpen:        boolean
   setOpen:       (v: boolean) => void
   dropRef:       React.RefObject<HTMLDivElement | null>
-  options:       import("../../lib/api").DefectCode[]
+  options:       import("../../../services/reworkApi").DefectCode[]
 }) {
   const filtered = options.filter(d =>
     d.defect_code.toLowerCase().includes(searchVal.toLowerCase()) ||

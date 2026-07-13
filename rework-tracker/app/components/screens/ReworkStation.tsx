@@ -2,7 +2,7 @@
 import { useState, useRef, useEffect } from "react";
 import { ArrowLeft, Search, CheckCircle2, ChevronDown, ChevronRight, Check } from "lucide-react";
 import { useRouter } from "next/navigation"
-import { fetchQueue, fetchLabel, updateLabel, formatDate, formatDateFromISO, fetchDefectCodes, type ApiLabel, type DefectCode} from "../../lib/api"
+import { fetchQueue, fetchLabel, updateLabel, formatDate, formatDateFromISO, fetchDefectCodes, type ApiLabel, type DefectCode} from "../../../services/reworkApi"
 
 type Status = ApiLabel["status"]
 
