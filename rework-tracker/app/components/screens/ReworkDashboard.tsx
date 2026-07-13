@@ -365,10 +365,35 @@ export function ReworkDashboard() {
           <meta charset="utf-8" />
           <title>Print Label</title>
           <style>
-            @page { size: ${PRINT_WIDTH_MM}mm auto; margin: 0; }
+            @page { 
+              size: ${PRINT_WIDTH_MM}mm auto; 
+              margin: 0; 
+            }
             * { box-sizing: border-box; }
-            html, body { margin: 0; padding: 0; width: ${PRINT_WIDTH_MM}mm; }
-            body { padding: 8px; font-family: Inter, Arial, sans-serif; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            
+            /* ปรับตัว html และ body ให้ขยับหลบขอบซ้ายที่โดนกิน */
+            html, body { 
+              margin: 0; 
+              padding: 0; 
+              background: #fff;
+            }
+            
+            body { 
+              /* ดันขอบซ้ายเข้ามา เพื่อหนีโซนบอดของหัวพิมพ์ที่ตัดตัวหนังสือแหว่ง */
+              padding: 6px 2px 6px 2mm; 
+              
+              /* บีบหน้ากว้างเนื้อหาจริงให้เหลือแคบกว่าหน้ากระดาษนิดหน่อย (ถ้ากระดาษ 57mm เนื้อหาจะวิ่งอยู่ที่ ~53mm) */
+              width: calc(${PRINT_WIDTH_MM}mm - 4mm); 
+              
+              font-family: Inter, Arial, sans-serif; 
+              -webkit-print-color-adjust: exact; 
+              print-color-adjust: exact; 
+            }
+
+            /* บังคับให้ตารางและดีฟล็อกข้างในทั้งหมดกางเต็มพอดีกรอบ body ใหม่ ไม่ให้โย้ล้นไปทางขวา */
+            body * {
+              max-width: 100% !important;
+            }
           </style>
         </head>
         <body>${content}</body>
@@ -663,7 +688,7 @@ export function ReworkDashboard() {
                   </span>
                 </div>
               </div>
-
+              
               <p style={{ fontSize: 9, color: "#000000", marginBottom: 8, lineHeight: 1.3, fontWeight: 600, wordBreak: "break-word" }}>
                 {printLabel.material_id ? `${printLabel.material_id} · ` : ""}{printLabel.description ?? "–"}
               </p>
@@ -686,9 +711,10 @@ export function ReworkDashboard() {
                       {printLabel.defect_codes.map(code => {
                         const opt = defectOptions.find(d => d.defect_code === code);
                         return (
-                          <div key={code} style={{ display: "grid", gridTemplateColumns: "30px 1fr", padding: "3px 4px", gap: 4, borderTop: "0.5px solid #E5E7EB", alignItems: "center" }}>
+                          <div key={code} style={{ display: "grid", gridTemplateColumns: "30px 1fr 20px", padding: "3px 4px", gap: 4, borderTop: "0.5px solid #E5E7EB", alignItems: "center" }}>
                             <span style={{ fontSize: 10, fontWeight: 600, color: "#000000" }}>{code}</span>
                             <span style={{ fontSize: 9, color: "#000000", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{opt?.description_th ?? "–"}</span>
+                            <span style={{ fontSize: 10, fontWeight: 600, color: "#000000", textAlign: "center" }}>{qty}</span>
                           </div>
                         );
                       })}
@@ -711,6 +737,7 @@ export function ReworkDashboard() {
                     --- END OF LABEL ---
                   </p>
                 </div>
+
               </div>
             </div>
           </div>

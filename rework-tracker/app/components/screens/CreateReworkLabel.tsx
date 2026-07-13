@@ -345,10 +345,10 @@ export function CreateReworkLabel() {
             
             body { 
               /* ดันขอบซ้ายเข้ามา เพื่อหนีโซนบอดของหัวพิมพ์ที่ตัดตัวหนังสือแหว่ง */
-              padding: 6px 2px 6px 6mm; 
+              padding: 6px 2px 6px 2mm; 
               
-              /* บีบหน้ากว้างเนื้อหาจริงให้เหลือแคบกว่าหน้ากระดาษนิดหน่อย (ถ้ากระดาษ 57mm เนื้อหาจะวิ่งอยู่ที่ ~51mm) */
-              width: calc(${PRINT_WIDTH_MM}mm - 2mm); 
+              /* บีบหน้ากว้างเนื้อหาจริงให้เหลือแคบกว่าหน้ากระดาษนิดหน่อย (ถ้ากระดาษ 57mm เนื้อหาจะวิ่งอยู่ที่ ~53mm) */
+              width: calc(${PRINT_WIDTH_MM}mm - 4mm); 
               
               font-family: Inter, Arial, sans-serif; 
               -webkit-print-color-adjust: exact; 

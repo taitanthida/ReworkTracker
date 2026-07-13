@@ -1,3 +1,5 @@
+.next/
+node_modules/
 rework-tracker/.next/
 rework-tracker/node_modules/
 .env
