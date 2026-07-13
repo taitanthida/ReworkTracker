@@ -211,8 +211,8 @@ function LogCell({ children, center, muted, green, red }: {
 function LabelFieldD({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <p style={{ fontSize: 9, color: "#8C8985", fontWeight: 600, letterSpacing: "0.05em", textTransform: "uppercase", marginBottom: 2 }}>{label}</p>
-      <p style={{ fontSize: 12, fontWeight: 600, color: "#000000" }}>{value}</p>
+      <p style={{ fontSize: 7, color: "#000000", fontWeight: 600, letterSpacing: "0.05em", textTransform: "uppercase", marginBottom: 2 }}>{label}</p>
+      <p style={{ fontSize: 9, fontWeight: 600, color: "#000000" }}>{value}</p>
     </div>
   );
 }
@@ -704,11 +704,11 @@ export function ReworkDashboard() {
                   <p style={{ fontSize: 20, fontWeight: 700, color: "#000000", margin: 0, lineHeight: 1.1 }}>{printLabel.input_qty}</p>
                 </div>
 
-                {printLabel.defect_codes.length > 0 && (
+                {printLabel.defect_details.length > 0 && (
                   <div style={{ gridColumn: "1 / -1" }}>
                     <p style={{ fontSize: 7, color: "#000000", fontWeight: 600, letterSpacing: "0.04em", textTransform: "uppercase", marginBottom: 4 }}>Defect Details</p>
                     <div style={{ border: "0.5px solid #E5E7EB", borderRadius: 4, overflow: "hidden" }}>
-                      {printLabel.defect_codes.map(code => {
+                      {printLabel.defect_details.map(({ code, qty }) => {
                         const opt = defectOptions.find(d => d.defect_code === code);
                         return (
                           <div key={code} style={{ display: "grid", gridTemplateColumns: "30px 1fr 20px", padding: "3px 4px", gap: 4, borderTop: "0.5px solid #E5E7EB", alignItems: "center" }}>
