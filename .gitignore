@@ -1,3 +1,11 @@
+rework-api/bin/
+rework-api/obj/
+**/bin/
+**/obj/
+*.dll
+*.exe
+*.pdb
+
 .next/
 node_modules/
 rework-tracker/.next/
