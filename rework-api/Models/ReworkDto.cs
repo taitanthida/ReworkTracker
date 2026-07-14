@@ -21,7 +21,9 @@ namespace ReworkApi.Models
         public int? InputQty { get; set; }
         public List<DefectDetailDto>? DefectCodes { get; set; }
         public string? Remark { get; set; }
+        public int? QcId { get; set; }
         public string? QcName { get; set; }
+        public int? IssuedById { get; set; }
         public string? IssuedBy { get; set; }
         public string? IssuedDate { get; set; } // รับมาเป็น DD/MM/YY สตริงตามเดิม
     }

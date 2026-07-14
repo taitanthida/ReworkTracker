@@ -96,8 +96,22 @@ export function formatDateFromISO(isoStr: string | null): string {
 
 // ── Fetch functions ───────────────────────────────────────────────────────────
 
-/** ดึง active users ทั้งหมด (ใช้สำหรับ dropdown QC Name) */
-export async function fetchUsers(): Promise<User[]> {
+/** ดึง user เฉพาะ role "qc" (สำหรับ dropdown QC Name) */
+export async function fetchQcUsers(): Promise<User[]> {
+  const res = await fetch(`${API}/users/qc`)
+  if (!res.ok) throw new Error(await res.text())
+  return res.json()
+}
+
+/** ดึง user เฉพาะ role "rw_station" (สำหรับ dropdown RW Station) */
+export async function fetchReworkUsers(): Promise<User[]> {
+  const res = await fetch(`${API}/users/rework`)
+  if (!res.ok) throw new Error(await res.text())
+  return res.json()
+}
+
+/** ดึง user ทุก role ที่ active (สำหรับ resolve ชื่อจาก *_by_id) */
+export async function fetchAllUsers(): Promise<User[]> {
   const res = await fetch(`${API}/users`)
   if (!res.ok) throw new Error(await res.text())
   return res.json()
@@ -175,7 +189,10 @@ export async function createLabel(data: {
   inputQty:     number
   defectCodes: { code: string; qty: number }[]
   remark:       string
+  qcId?:        number   // ผู้ตรวจ (QC) — ใช้เป็น issued_by_id ด้วย
   qcName:       string
+  issuedById?:  number   // = qcId (คนตรวจ = คนออกใบ)
+  issuedBy?:    string   // = qcName
   issuedDate:   string   // DD/MM/YY — API แปลงให้เอง
 }) {
   const res = await fetch(`${API}/labels`, {
@@ -200,7 +217,10 @@ export async function updateLabel(labelId: string, updates: {
   // users — ใส่ได้เมื่อมี login
   qcInspectorId?: number
   receivedById?:  number
+  receivedBy?:    string   // username เก็บลงคอลัมน์ received_by
   returnedById?:  number
+  closedById?:    number   // = qcId (คนตรวจ = คนปิดงาน)
+  closedBy?:      string   // = qcName
 }) {
   const res = await fetch(`${API}/labels/${labelId}`, {
     method: "PATCH",

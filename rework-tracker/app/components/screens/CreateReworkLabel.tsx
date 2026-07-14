@@ -3,7 +3,7 @@ import { useState, useRef, useEffect, type CSSProperties, type ReactNode } from 
 import { ArrowLeft, Search, Send, Check, Printer, ChevronDown, X } from "lucide-react";
 import { useRouter } from "next/navigation"
 import { fetchReturnedLabels, fetchOrderInfoNormalized, generateLabelId, createLabel, updateLabel, formatDate,
-  formatDateFromISO, fetchDefectCodes, fetchUsers, type ApiLabel, type OrderInfo, type DefectCode, type User } from "../../../services/reworkApi"
+  formatDateFromISO, fetchDefectCodes, fetchQcUsers, type ApiLabel, type OrderInfo, type DefectCode, type User } from "../../../services/reworkApi"
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -67,6 +67,7 @@ export function CreateReworkLabel() {
   // ── UI state ────────────────────────────────────────────────────────────────
   const [showPrint, setShowPrint] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // ── Returned queue filter state ─────────────────────────────────────────────
   const [retOpenCol, setRetOpenCol] = useState<RetColKey | null>(null);
@@ -97,7 +98,7 @@ export function CreateReworkLabel() {
   useEffect(() => {
     fetchReturnedLabels().then(setReturnedLabels).catch(console.error);
     fetchDefectCodes().then(setDefectOptions).catch(console.error);
-    fetchUsers().then(data => setUsers(data.filter(u => u.role === "qc" || u.role === "admin"))).catch(console.error);
+    fetchQcUsers().then(setUsers).catch(console.error);
   }, []);
 
   // Fetch order info when orderNo changes
@@ -168,7 +169,10 @@ export function CreateReworkLabel() {
   const panelId      = isReturned ? (hasFailures ? previewLabelId : selected!.label_id) : previewLabelId;
   const panelDesc    = isReturned ? selected!.description  : (info?.description ?? null);
   const panelQty     = isReturned ? selected!.input_qty    : (total ? Number(total) : null);
-  const panelRound   = isReturned ? selected!.round_no + 1 : 1;
+  // New (non-returned) label = next round for the order. round_no is unique per
+  // order, so if the order already has rounds we must issue the next one — never 1.
+  const newRound     = (info?.latestRoundNo ?? 0) + 1;
+  const panelRound   = isReturned ? selected!.round_no + 1 : newRound;
   const panelPassed  = isReturned ? (riPassed ? Number(riPassed) : null) : (passed ? Number(passed) : null);
   const panelFailed  = isReturned ? riFailed               : newFailed;
   const panelDefects = isReturned ? riDefectCodes          : defectCodes;
@@ -239,19 +243,20 @@ export function CreateReworkLabel() {
   // ── Submit handler ───────────────────────────────────────────────────────────
 
   async function handleConfirm() {
+    // Guard against double-submit (double-click / click before the 2s reset finishes),
+    // which previously closed a round twice and collided on uq_order_round.
+    if (isSubmitting) return;
+    setIsSubmitting(true);
     const today = formatDate();
+    // The inspecting QC is also the issuer / closer for this action:
+    // qc_id = issued_by_id = closed_by_id, qc_name = issued_by = closed_by.
+    const qcId = users.find(u => u.username === qcName)?.id;
     try {
       if (isReturned && selected) {
-        // Close current round
         const currentFailed = Math.max(0, selected.input_qty - (Number(riPassed) || 0));
-        await updateLabel(selected.label_id, {
-          status:        "CLOSED",
-          resultGoodQty: Number(riPassed),
-          resultBadQty:  currentFailed,
-          closedDate:    today,
-        });
 
-        // If still has failures, create next round label
+        // Create next round FIRST (server allocates round_no atomically). If this
+        // fails, the current round stays RETURNED — no partial "closed but no next".
         if (hasFailures) {
           const newId = await generateLabelId(qcDate);
           await createLabel({
@@ -266,12 +271,25 @@ export function CreateReworkLabel() {
             status:      "ISSUED",
             defectCodes: Array.from(riDefectCodes.entries()).map(([code, qty]) => ({ code, qty })),
             remark:      riRemark,
+            qcId:        qcId,
             qcName:      qcName,
+            issuedById:  qcId,
+            issuedBy:    qcName,
             issuedDate:  today,
           });
         }
+
+        // Close current round only after the next round exists (or none is needed)
+        await updateLabel(selected.label_id, {
+          status:        "CLOSED",
+          resultGoodQty: Number(riPassed),
+          resultBadQty:  currentFailed,
+          closedDate:    today,
+          closedById:    qcId,
+          closedBy:      qcName,
+        });
       } else {
-        // Create round 1 label
+        // Create next-round label (round 1 if the order has never been reworked)
         const failed = Math.max(0, Number(total) - (Number(passed) || 0));
         const newId  = await generateLabelId(qcDate);
         await createLabel({
@@ -282,11 +300,14 @@ export function CreateReworkLabel() {
           linePost:    info?.linePost    ?? "",
           total:       info?.total       ?? null,
           inputQty:    failed,
-          round:       1,
+          round:       newRound,
           status:      "ISSUED",
           defectCodes: Array.from(defectCodes.entries()).map(([code, qty]) => ({ code, qty })),
           remark,
+          qcId:        qcId,
           qcName:      qcName,
+          issuedById:  qcId,
+          issuedBy:    qcName,
           issuedDate:  today,
         });
       }
@@ -299,11 +320,14 @@ export function CreateReworkLabel() {
         setSelected(null);
         setRiPassed("");
         setRiDefectCodes(new Map()); setRiRemark("");
+        setIsSubmitting(false);
         fetchReturnedLabels().then(setReturnedLabels).catch(console.error);
       }, 2000);
 
     } catch (err) {
       console.error("handleConfirm error:", err);
+      // Release the guard so the QC can correct input and retry
+      setIsSubmitting(false);
       // TODO: replace with toast
     }
   }
@@ -381,7 +405,7 @@ export function CreateReworkLabel() {
       {/* App bar */}
       <div style={{ height: 56, background: "#fff", borderBottom: "0.5px solid #E5E7EB", display: "flex", alignItems: "center", padding: "0 32px", gap: 12 }}>
         <button
-          onClick={() => router.push("/")}
+          onClick={() => router.push("/rework")}
           style={{ width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center", background: "none", border: "none", cursor: "pointer", borderRadius: 8, color: "#8C8985" }}>
           <ArrowLeft size={18} />
         </button>
@@ -432,7 +456,7 @@ export function CreateReworkLabel() {
                   Inspection result
                 </p>
                 <span style={{ display: "inline-flex", alignItems: "center", padding: "2px 10px", borderRadius: 999, background: "#8DBAED", color: "#fff", fontSize: 12, fontWeight: 600 }}>
-                  {isReturned ? `Round ${selected!.round_no + 1}` : "Round 1"}
+                  {isReturned ? `Round ${selected!.round_no + 1}` : `Round ${newRound}`}
                 </span>
                 {isReturned && <span style={{ fontSize: 12, color: "#8DBAED" }}>(re-inspection)</span>}
                 <button
@@ -608,19 +632,19 @@ export function CreateReworkLabel() {
               )}
 
               {!isReturned && panelId && (
-                <button onClick={() => canIssue && handleConfirm()} disabled={!canIssue} style={ctaBtn(canIssue ? "#8DBAED" : "#E5E7EB", canIssue ? "#fff" : "#9CA3AF")}>
+                <button onClick={() => canIssue && !isSubmitting && handleConfirm()} disabled={!canIssue || isSubmitting} style={ctaBtn(canIssue && !isSubmitting ? "#8DBAED" : "#E5E7EB", canIssue && !isSubmitting ? "#fff" : "#9CA3AF")}>
                   <Send size={15} /> Issue rework label
                 </button>
               )}
 
               {isReturned && hasFailures && (
-                <button onClick={() => canIssue && handleConfirm()} disabled={!canIssue} style={ctaBtn(canIssue ? "#B91C1C" : "#E5E7EB", canIssue ? "#fff" : "#9CA3AF")}>
+                <button onClick={() => canIssue && !isSubmitting && handleConfirm()} disabled={!canIssue || isSubmitting} style={ctaBtn(canIssue && !isSubmitting ? "#B91C1C" : "#E5E7EB", canIssue && !isSubmitting ? "#fff" : "#9CA3AF")}>
                   <Send size={15} /> Issue round {panelRound} label
                 </button>
               )}
 
               {isReturned && allPassed && (
-                <button onClick={() => canIssue && handleConfirm()} disabled={!canIssue} style={ctaBtn(canIssue ? "#16A34A" : "#E5E7EB", canIssue ? "#fff" : "#9CA3AF")}>
+                <button onClick={() => canIssue && !isSubmitting && handleConfirm()} disabled={!canIssue || isSubmitting} style={ctaBtn(canIssue && !isSubmitting ? "#16A34A" : "#E5E7EB", canIssue && !isSubmitting ? "#fff" : "#9CA3AF")}>
                   <Check size={15} /> Close order
                 </button>
               )}

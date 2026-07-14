@@ -1,5 +1,5 @@
 "use client"
-import { HomePage } from "./components/screens/HomePage"
+import { ProjectMenu } from "./components/screens/ProjectMenu"
 export default function RootPage() {
-  return <HomePage />
+  return <ProjectMenu />
 }

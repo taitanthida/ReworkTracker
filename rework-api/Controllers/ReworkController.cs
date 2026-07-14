@@ -204,21 +204,31 @@ namespace ReworkApi.Controllers
                     body.OrderId, body.MaterialId, body.Description, body.LinePost, body.Total
                 }, transaction);
 
-                // 2. Insert ข้อมูลลงตาราง rework_labels
+                // 2. จัดสรรเลข round แบบ atomic ในทรานแซกชัน — กันชน uq_order_round
+                // เมื่อ UI ค้าง/ส่งซ้ำ หรือมี round ใหม่กว่าที่ client เห็น
+                // (client ส่ง body.Round มาเพื่อ hint แต่ server เป็นผู้ตัดสินเลขจริง)
+                string nextRoundSql = @"
+                    SELECT COALESCE(MAX(round_no), 0) + 1
+                    FROM rework_labels
+                    WHERE order_id = @OrderId
+                    FOR UPDATE";
+                int nextRound = await conn.ExecuteScalarAsync<int>(nextRoundSql, new { body.OrderId }, transaction);
+
+                // 3. Insert ข้อมูลลงตาราง rework_labels
                 string insertLabelSql = @"
                     INSERT INTO rework_labels (
-                        label_id, order_id, round_no, status, input_qty, remark, qc_name, issued_by, issued_at
-                    ) VALUES (@LabelId, @OrderId, @Round, @Status, @InputQty, @Remark, @QcName, @IssuedBy, @IssuedAt)";
+                        label_id, order_id, round_no, status, input_qty, remark, qc_id, qc_name, issued_by_id, issued_by, issued_at
+                    ) VALUES (@LabelId, @OrderId, @Round, @Status, @InputQty, @Remark, @QcId, @QcName, @IssuedById, @IssuedBy, @IssuedAt)";
 
                 await conn.ExecuteAsync(insertLabelSql, new {
-                    body.LabelId, body.OrderId, body.Round,
+                    body.LabelId, body.OrderId, Round = nextRound,
                     Status = body.Status ?? "ISSUED",
                     InputQty = body.InputQty ?? 0,
-                    body.Remark, body.QcName, body.IssuedBy,
+                    body.Remark, body.QcId, body.QcName, body.IssuedById, body.IssuedBy,
                     IssuedAt = ParseDate(body.IssuedDate)
                 }, transaction);
 
-                // 3. Insert / Update ตารางย่อย label_defects
+                // 4. Insert / Update ตารางย่อย label_defects
                 if (body.DefectCodes != null && body.DefectCodes.Count > 0)
                 {
                     string insertDefectSql = @"
@@ -235,7 +245,7 @@ namespace ReworkApi.Controllers
                 }
 
                 transaction.Commit();
-                return Ok(new { success = true, labelId = body.LabelId });
+                return Ok(new { success = true, labelId = body.LabelId, round = nextRound });
             }
             catch (Exception ex)
             {
@@ -361,6 +371,21 @@ namespace ReworkApi.Controllers
             {
                 await conn.OpenAsync();
                 string sql = "SELECT id, username, full_name, role FROM users WHERE role = 'rw_station' AND is_active = 1";
+                var users = await conn.QueryAsync(sql);
+                return Ok(users);
+            }
+            catch (Exception ex) { return StatusCode(500, new { error = ex.Message }); }
+        }
+
+        // GET /api/users (ทุก role ที่ active — ใช้ resolve ชื่อจาก *_by_id)
+        [HttpGet("users")]
+        public async Task<IActionResult> GetUsers()
+        {
+            using var conn = new MySqlConnection(_connectionString);
+            try
+            {
+                await conn.OpenAsync();
+                string sql = "SELECT id, username, full_name, role FROM users WHERE is_active = 1";
                 var users = await conn.QueryAsync(sql);
                 return Ok(users);
             }

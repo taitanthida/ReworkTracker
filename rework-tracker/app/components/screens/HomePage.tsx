@@ -1,7 +1,7 @@
 "use client"
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { LayoutDashboard, FilePlus, Wrench } from "lucide-react"
+import { LayoutDashboard, FilePlus, Wrench, ArrowLeft } from "lucide-react"
 import type { ReactNode } from "react"
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -45,6 +45,7 @@ const PAGES = [
     route: "/station",
     accent: "#92400E",
   },
+
 ];
 
 // ── Main component ────────────────────────────────────────────────────────────
@@ -73,7 +74,15 @@ export function HomePage() {
   const isAllowed = (route: string) => !!role && ROLE_ALLOWED[role].includes(route);
 
   return (
-    <div style={{ width: "100%", minHeight: "100vh", background: "#F0EEE4", fontFamily: "Inter, sans-serif", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "40px 32px" }}>
+    <div style={{ width: "100%", minHeight: "100vh", background: "#F0EEE4", fontFamily: "Inter, sans-serif", position: "relative", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "40px 32px" }}>
+
+      {/* Back to project menu */}
+      <button
+        onClick={() => router.push("/")}
+        style={{ position: "absolute", top: 24, left: 32, display: "flex", alignItems: "center", gap: 6, height: 34, padding: "0 12px", background: "#fff", border: "0.5px solid #E5E7EB", borderRadius: 999, fontSize: 13, fontWeight: 500, color: "#6B7280", cursor: "pointer", fontFamily: "Inter, sans-serif" }}
+      >
+        <ArrowLeft size={16} /> Projects
+      </button>
 
       {/* Header */}
       <div style={{ textAlign: "center", marginBottom: 40 }}>
