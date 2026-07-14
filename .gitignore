@@ -5,6 +5,9 @@ rework-api/obj/
 *.dll
 *.exe
 *.pdb
+appsettings.json
+appsettings.*.json
+!appsettings.example.json
 
 .next/
 node_modules/
@@ -13,3 +16,4 @@ rework-tracker/node_modules/
 .env
 .env.*
 .DS_Store
+rework-api/appsettings.json
