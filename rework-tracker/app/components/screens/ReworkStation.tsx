@@ -2,7 +2,7 @@
 import { useState, useRef, useEffect } from "react";
 import { ArrowLeft, Search, CheckCircle2, ChevronDown, ChevronRight, Check } from "lucide-react";
 import { useRouter } from "next/navigation"
-import { fetchQueue, fetchLabel, updateLabel, formatDate, formatDateFromISO, fetchDefectCodes, type ApiLabel, type DefectCode} from "../../../services/reworkApi"
+import { fetchQueue, fetchLabel, updateLabel, formatDate, formatDateFromISO, fetchDefectCodes, fetchAllUsers, type ApiLabel, type DefectCode, type User } from "../../../services/reworkApi"
 
 type Status = ApiLabel["status"]
 
@@ -94,6 +94,10 @@ export function ReworkStation() {
   const router   = useRouter();
   const [defectOptions, setDefectOptions] = useState<DefectCode[]>([]);
 
+  // ── Users (for "Received By") ───────────────────────────────────────────────
+  const [users,       setUsers]       = useState<User[]>([]);
+  const [receivedBy,  setReceivedBy]  = useState(""); // holds selected user id (as string, from <select>)
+
   useEffect(() => {
     fetchQueue()
       .then(data => { setQueue(data); setLoading(false); })
@@ -103,6 +107,7 @@ export function ReworkStation() {
   useEffect(() => {
     if (!labelId) { setLabel(null); return; }
     fetchLabel(labelId).then(setLabel).catch(() => setLabel(null));
+    setReceivedBy(""); // reset the picker whenever a different label is looked up
   }, [labelId]);
 
   useEffect(() => {
@@ -114,7 +119,15 @@ export function ReworkStation() {
   }, []);
 
   useEffect(() => {
-  fetchDefectCodes().then(setDefectOptions).catch(console.error);
+    fetchDefectCodes().then(setDefectOptions).catch(console.error);
+  }, []);
+
+  useEffect(() => {
+    // Keep the FULL user list here (no role filter) — it's used both for the
+    // "Received By" dropdown options AND for looking up the display name of
+    // whoever already received a label. Filtering it down would break the
+    // name lookup for any label received by a user outside that role subset.
+    fetchAllUsers().then(setUsers).catch(console.error);
   }, []);
 
   // ── Filter helpers ──────────────────────────────────────────────────────────
@@ -158,9 +171,17 @@ export function ReworkStation() {
   // ── Action handlers ─────────────────────────────────────────────────────────
 
   async function handleReceive() {
+    if (!receivedBy) return;
+    const receivedByIdNum   = Number(receivedBy);
+    const receivedByName    = users.find(u => u.id === receivedByIdNum)?.username ?? "";
     try {
-      await updateLabel(labelId, { status: "IN_PROGRESS", receivedDate: formatDate() });
-      setLabel(prev => prev ? { ...prev, status: "IN_PROGRESS", received_at: new Date().toISOString() } : prev);
+      await updateLabel(labelId, {
+        status:        "IN_PROGRESS",
+        receivedDate:  formatDate(),
+        receivedById:  receivedByIdNum,
+        receivedBy:    receivedByName,
+      });
+      setLabel(prev => prev ? { ...prev, status: "IN_PROGRESS", received_at: new Date().toISOString(), received_by_id: receivedByIdNum } : prev);
       setQueue(prev => prev.map(r => r.label_id === labelId ? { ...r, status: "IN_PROGRESS" } : r));
       setReceivedId(labelId);
       setShowReceived(true);
@@ -191,7 +212,7 @@ export function ReworkStation() {
       {/* App bar */}
       <div style={{ height: 56, background: "#fff", borderBottom: "0.5px solid #E5E7EB", display: "flex", alignItems: "center", padding: "0 32px", gap: 12 }}>
         <button
-          onClick={() => router.push("/")}
+          onClick={() => router.push("/rework")}
           style={{ width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center", background: "none", border: "none", cursor: "pointer", borderRadius: 8, color: "#8C8985" }}
         >
           <ArrowLeft size={18} />
@@ -222,6 +243,7 @@ export function ReworkStation() {
           {label && (() => {
             const isJustReceived = receivedId === labelId;
             const status         = label.status;
+            const receivedByName = users.find(u => u.id === label.received_by_id)?.username ?? "–";
 
             return (
               <div style={{ background: "#F9FAFB", border: "0.5px solid #E5E7EB", borderRadius: 8, padding: 16, display: "flex", gap: 24 }}>
@@ -257,6 +279,7 @@ export function ReworkStation() {
                   </div>
                   <DetailField label="QC Name" value={label.qc_name || "–"} />
                   <DetailField label="Issued Date"   value={formatDateFromISO(label.issued_at)   || "–"} />
+                  <DetailField label="Received By"   value={receivedByName} />
                   <DetailField label="Received Date" value={formatDateFromISO(label.received_at) || "–"} />
                   <DetailField label="Returned Date" value={formatDateFromISO(label.returned_at) || "–"} />
                 </div>
@@ -273,14 +296,36 @@ export function ReworkStation() {
                     </div>
                   )}
 
+                  {/* Received By picker — only relevant while still ISSUED (about to receive) */}
+                  {status === "ISSUED" && !isJustReceived && (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                      <p style={{ fontSize: 11, color: "#000000", fontWeight: 500 }}>Received By</p>
+                      <div style={{ position: "relative" }}>
+                        <select
+                          value={receivedBy}
+                          onChange={e => setReceivedBy(e.target.value)}
+                          style={{ width: "100%", height: 38, padding: "0 32px 0 10px", fontSize: 13, color: receivedBy ? "#000000" : "#8C8985", background: "#fff", border: "0.5px solid #E5E7EB", borderRadius: 8, outline: "none", appearance: "none", boxSizing: "border-box", fontFamily: "Inter, sans-serif", cursor: "pointer" }}
+                          onFocus={e => (e.target.style.borderColor = "#8DBAED")}
+                          onBlur={e  => (e.target.style.borderColor = "#E5E7EB")}
+                        >
+                          <option value="">-</option>
+                          {users.filter(u => u.role === "rw_station" || u.role === "admin").map(u => (
+                            <option key={u.id} value={u.id}>{u.username}</option>
+                          ))}
+                        </select>
+                        <ChevronDown size={12} color="#8C8985" style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }} />
+                      </div>
+                    </div>
+                  )}
+
                   {/* Receive */}
                   <button
-                    onClick={status === "ISSUED" && !isJustReceived ? handleReceive : undefined}
-                    disabled={status !== "ISSUED" || isJustReceived}
+                    onClick={status === "ISSUED" && !isJustReceived && receivedBy ? handleReceive : undefined}
+                    disabled={status !== "ISSUED" || isJustReceived || !receivedBy}
                     style={{ width: "100%", height: 44, border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, fontFamily: "Inter, sans-serif",
-                      background: status === "ISSUED" && !isJustReceived ? "#FCCF61" : "#E5E7EB",
-                      color:      status === "ISSUED" && !isJustReceived ? "#fff"    : "#9CA3AF",
-                      cursor:     status === "ISSUED" && !isJustReceived ? "pointer" : "not-allowed",
+                      background: status === "ISSUED" && !isJustReceived && receivedBy ? "#FCCF61" : "#E5E7EB",
+                      color:      status === "ISSUED" && !isJustReceived && receivedBy ? "#fff"    : "#9CA3AF",
+                      cursor:     status === "ISSUED" && !isJustReceived && receivedBy ? "pointer" : "not-allowed",
                       display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
                     }}
                   >
@@ -304,7 +349,8 @@ export function ReworkStation() {
                   </button>
 
                   {/* Hint text */}
-                  {status === "ISSUED"       && !isJustReceived && <p style={{ fontSize: 11, color: "#9CA3AF", textAlign: "center", marginTop: 2 }}>Complete available after receiving</p>}
+                  {status === "ISSUED"       && !isJustReceived && !receivedBy && <p style={{ fontSize: 11, color: "#9CA3AF", textAlign: "center", marginTop: 2 }}>เลือกชื่อผู้รับก่อน</p>}
+                  {status === "ISSUED"       && !isJustReceived && receivedBy  && <p style={{ fontSize: 11, color: "#9CA3AF", textAlign: "center", marginTop: 2 }}>Complete available after receiving</p>}
                   {status === "IN_PROGRESS"  && <p style={{ fontSize: 11, color: "#9CA3AF", textAlign: "center", marginTop: 2 }}>Complete & return to QC</p>}
                   {status === "RETURNED"     && <p style={{ fontSize: 11, color: "#9CA3AF", textAlign: "center", marginTop: 2 }}>Waiting for QC re-inspection</p>}
                   {status === "CLOSED"       && <p style={{ fontSize: 11, color: "#9CA3AF", textAlign: "center", marginTop: 2 }}>Order closed</p>}
