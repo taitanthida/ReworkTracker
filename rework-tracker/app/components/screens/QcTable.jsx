@@ -36,12 +36,12 @@ function CellContent({ cell, group }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 2 }}>
       {cell.star > 0 && (
-        <span style={{ fontWeight: 700, color: group === "final" ? C.starFinal : C.starPost, fontSize: 11, lineHeight: 1.2 }}>
+        <span style={{ fontWeight: 700, color: group === "final" ? C.starFinal : C.starPost, fontSize: 14, lineHeight: 1.2 }}>
           ★ {cell.star.toLocaleString()}
         </span>
       )}
       {cell.blank > 0 && (
-        <span style={{ color: group === "final" ? C.blankFinal : C.blankPost, fontSize: 10, lineHeight: 1.2 }}>
+        <span style={{ fontWeight: 550, color: group === "final" ? C.blankFinal : C.blankPost, fontSize: 12, lineHeight: 1.2 }}>
           {cell.blank.toLocaleString()}
         </span>
       )}
@@ -51,7 +51,7 @@ function CellContent({ cell, group }) {
 
 // ── Table ─────────────────────────────────────────────────────────────────────
 
-export default function QcTable() {
+export default function Table() {
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(false);
   const [masterMaterials, setMasterMaterials] = useState([]); 
@@ -208,27 +208,14 @@ export default function QcTable() {
       `}</style>
 
       <div className="max-w-full">
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+          <h1 className="text-base font-bold m-0" style={{ fontSize: 20, color: C.text }}>
+            QC Dashboard
+          </h1>
 
-        <h1 className="text-lg font-bold mb-5" style={{ color: C.text }}>QC Dashboard</h1>
-
-        <div className="flex flex-wrap gap-4 mb-4">
-          {[
-            { color: C.starFinal,  label: "FINS ★ — START" },
-            { color: C.blankFinal, label: "FINS ○ — (blank)" },
-            { color: C.starPost,   label: "POSP ★ — START" },
-            { color: C.blankPost,  label: "POSP ○ — (blank)" },
-          ].map(l => (
-            <div key={l.label} className="flex items-center gap-1">
-              <span style={{ width: 10, height: 10, borderRadius: "50%", background: l.color, display: "inline-block" }} />
-              <span className="text-xs" style={{ color: C.textMuted }}>{l.label}</span>
-            </div>
-          ))}
-        </div>
-
-        <div ref={filterRef} style={{ display: "flex", gap: 8, marginBottom: 20 }}>
-          <div style={{ position: "relative" }}>
+          <div ref={filterRef} style={{ position: "relative" }}>
             <button onClick={openFilter}
-              style={{ height: 36, padding: "0 12px", display: "flex", alignItems: "center", gap: 6,
+              style={{ height: 34, padding: "0 12px", display: "flex", alignItems: "center", gap: 6,
                 background: C.white, border: `0.5px solid ${activeMaterial ? C.accent : C.border}`,
                 borderRadius: 8, fontSize: 12, color: C.text, cursor: "pointer", fontFamily: "Inter, sans-serif" }}>
               <span>Material</span>
@@ -241,7 +228,7 @@ export default function QcTable() {
             </button>
 
             {isOpen && (
-              <div style={{ position: "absolute", top: "calc(100% + 4px)", left: 0, zIndex: 100,
+              <div style={{ position: "absolute", top: "calc(100% + 4px)", right: 0, zIndex: 100,
                 background: "#fff", border: "1px solid #E5E7EB", borderRadius: 8,
                 minWidth: 200, boxShadow: "0 4px 12px rgba(0,0,0,0.08)", overflow: "hidden" }}>
 
@@ -291,7 +278,7 @@ export default function QcTable() {
 
         {/* custom-scrollbar */}
         <div id="custom-scrollbar" className="rounded-xl" 
-          style={{ background: C.white, border: `0.5px solid ${C.border}`, overflowX: needsScroll ? "auto" : "visible", overflowY: "auto", maxHeight: "calc(100vh - 200px)", position: "relative" }}>
+          style={{ background: C.white, border: `0.5px solid ${C.border}`, overflowX: "auto", overflowY: "auto", maxHeight: "calc(100vh - 150px)", position: "relative" }}>
           
           {loading && (
             <div style={{ position: "absolute", inset: 0, background: "rgba(255,255,255,0.7)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 50, fontSize: 14, fontWeight: 600, color: C.textMuted }}>
@@ -299,7 +286,7 @@ export default function QcTable() {
             </div>
           )}
 
-          <table style={{ fontSize: 12, borderCollapse: "separate", borderSpacing: 0, fontFamily: "Inter, sans-serif", tableLayout: "fixed", width: needsScroll ? "max-content" : "100%", minWidth: "100%" }}>
+          <table style={{ fontSize: 12, borderCollapse: "separate", borderSpacing: 0, fontFamily: "Inter, sans-serif", tableLayout: "fixed", width: needsScroll ? "max-content" : "100%"}}>
             <colgroup>
               <col style={{ width: 160 }} />
               {colKeys.map(c => <col key={c.key} style={{ width: COL_W }} />)}
@@ -311,7 +298,7 @@ export default function QcTable() {
                     ...stickyLeft, 
                     width: 160, 
                     height: 36, 
-                    fontSize: 10, 
+                    fontSize: 12, 
                     fontWeight: 700, 
                     letterSpacing: "0.07em", 
                     textTransform: "uppercase", 
@@ -344,7 +331,7 @@ export default function QcTable() {
                       width: COL_W, 
                       minWidth: COL_W, 
                       height: 32, 
-                      fontSize: 10, 
+                      fontSize: 12, 
                       fontWeight: 600, 
                       borderRight: `0.5px solid ${C.headerBorder}`, 
                       borderBottom: `1px solid ${C.headerBorder}`, 
@@ -377,7 +364,7 @@ export default function QcTable() {
                           color: C.text, 
                           borderRight: `0.5px solid ${C.border}`, 
                           borderBottom: `0.5px solid ${C.border}`, 
-                          fontSize: 11, 
+                          fontSize: 12, 
                           width: 160, 
                           maxWidth: 160, 
                           overflow: "hidden" 
@@ -403,6 +390,20 @@ export default function QcTable() {
               )}
             </tbody>
           </table>
+        </div>
+
+        <div className="flex flex-wrap gap-4 mb-4">
+          {[
+            { color: C.starFinal,  label: "FINS ★ — START" },
+            { color: C.blankFinal, label: "FINS ○ — (blank)" },
+            { color: C.starPost,   label: "POSP ★ — START" },
+            { color: C.blankPost,  label: "POSP ○ — (blank)" },
+          ].map(l => (
+            <div key={l.label} className="flex items-center gap-1">
+              <span style={{ width: 10, height: 10, borderRadius: "50%", background: l.color, marginTop: 20 , display: "inline-block" }} />
+              <span className="text-xs" style={{ color: C.textMuted, marginTop: 20 }}>{l.label}</span>
+            </div>
+          ))}
         </div>
 
       </div>
