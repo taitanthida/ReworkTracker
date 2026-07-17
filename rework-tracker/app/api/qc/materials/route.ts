@@ -1,34 +1,25 @@
-import { NextResponse } from "next/server"
-import { getPool } from "@/lib/mssql"
+import { NextResponse } from 'next/server';
+import { getSqlServerPool } from '@/lib/db'; 
 
-// GET /api/qc/materials
-// พอร์ตจาก C# qc-api: ดึงรายชื่อ Material ทั้งหมด (ใช้ทำ filter dropdown)
-// เดิม: SELECT DISTINCT [Material] FROM [SMTKPIDASHBOARD].[dbo].[WIP_DATA]
-//       WHERE [OrderType] = 'M001' AND [Material] IS NOT NULL
 export async function GET() {
   try {
-    const pool = await getPool()
+    // 1. เรียกใช้ Pool 
+    const pool = await getSqlServerPool();
+    
+    // 2. ยิง Query ผ่าน Pool ได้ทันที
     const result = await pool.request().query(`
-      SELECT DISTINCT [Material]
+      SELECT DISTINCT [Material] 
       FROM [SMTKPIDASHBOARD].[dbo].[WIP_DATA]
       WHERE [OrderType] = 'M001' AND [Material] IS NOT NULL
-    `)
+    `);
 
-    const materials: string[] = result.recordset.map(
-      (r: { Material: unknown }) => (r.Material ?? "").toString()
-    )
-
-    return NextResponse.json(materials)
-  } catch (err) {
-    console.error("GET /api/qc/materials error:", err)
-    // dev เท่านั้น: แนบสาเหตุจริงเพื่อ debug (ไม่เปิดเผยตอน production)
-    const detail =
-      process.env.NODE_ENV !== "production" && err instanceof Error
-        ? err.message
-        : undefined
+    const materials = result.recordset.map(row => row.Material);
+    return NextResponse.json(materials);
+  } catch (error: any) {
+    console.error('Database error in /api/qc/materials:', error);
     return NextResponse.json(
-      { error: "Failed to load master materials", detail },
+      { error: error.message || 'Internal Server Error' }, 
       { status: 500 }
-    )
+    );
   }
 }

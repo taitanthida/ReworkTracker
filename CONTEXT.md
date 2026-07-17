@@ -426,3 +426,24 @@ npm run dev
 ```
 
 Browser: `http://localhost:3000`
+
+app/
+└── api/
+    └── rework/
+        ├── defect-codes/
+        │   └── route.ts         # เส้นที่ 1: GET /api/rework/defect-codes
+        ├── users/
+        │   └── route.ts         # เส้นที่ 2-4: GET /api/rework/users (รับ ?role=qc หรือ rw_station ได้ในไฟล์เดียว)
+        ├── orders/
+        │   ├── route.ts         # เส้นที่ 5: GET /api/rework/orders (Search ออเดอร์)
+        │   └── [id]/
+        │       └── route.ts     # เส้นที่ 6: GET /api/rework/orders/[id] (ดูยอดรีเวิร์คล่าสุดของออเดอร์นั้น)
+        ├── sync/
+        │   └── orders/
+        │       └── route.ts     # เส้นที่ 7: GET /api/rework/sync/orders (ดึง SQL Server -> ลง MySQL)
+        └── labels/
+            ├── route.ts         # เส้นที่ 8-9: GET /api/rework/labels และ POST /api/rework/labels (สร้างป้าย)
+            ├── queue/
+            │   └── route.ts     # เส้นที่ 10: GET /api/rework/labels/queue (คิวงานค้าง)
+            └── [id]/
+                └── route.ts     # เส้นที่ 11: GET และ PATCH /api/rework/labels/[id] (ดูรายใบ/อัปเดตงาน)

@@ -4,7 +4,7 @@ import { ArrowLeft, Search, CheckCircle2, ChevronDown, ChevronRight, Check } fro
 import { useRouter } from "next/navigation"
 import { fetchQueue, fetchLabel, updateLabel, formatDate, formatDateFromISO, fetchDefectCodes, fetchAllUsers, type ApiLabel, type DefectCode, type User } from "../../../services/reworkApi"
 
-type Status = ApiLabel["status"]
+type Status = ApiLabel["status"];
 
 const BADGE: Record<Status, { label: string; bg: string; color: string }> = {
   ISSUED:      { label: "Issued",      bg: "#FEE2E2", color: "#991B1B" },
@@ -34,7 +34,7 @@ const labelCss: React.CSSProperties = { fontSize: 10, color: "#8C8985", marginBo
 // ── Sub-components ────────────────────────────────────────────────────────────
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
-  return <p style={{ fontSize: 11, fontWeight: 600, color: "#8C8985", letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 12 }}>{children}</p>;
+  return <p style={{ fontSize: 11, fontWeight: 600, color: "#000000", letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 12 }}>{children}</p>;
 }
 
 function DetailField({ label, value, color }: { label: string; value: string; color?: string }) {
@@ -47,10 +47,10 @@ function DetailField({ label, value, color }: { label: string; value: string; co
 }
 
 function StatusPill({ status }: { status: Status }) {
-  const { label, bg, color } = BADGE[status];
+  const badgeInfo = BADGE[status] || { label: status, bg: "#E5E7EB", color: "#374151" };
   return (
-    <span style={{ display: "inline-flex", alignItems: "center", padding: "2px 10px", borderRadius: 999, background: bg, color, fontSize: 11, fontWeight: 500 }}>
-      {label}
+    <span style={{ display: "inline-flex", alignItems: "center", padding: "2px 10px", borderRadius: 999, background: badgeInfo.bg, color: badgeInfo.color, fontSize: 11, fontWeight: 500 }}>
+      {badgeInfo.label}
     </span>
   );
 }
@@ -90,6 +90,7 @@ export function ReworkStation() {
   const [filters,      setFilters]      = useState<Filters>({});
   const [draft,        setDraft]        = useState<Set<string>>(new Set());
   const [search,       setSearch]       = useState("");
+  const [queueSearchText, setQueueSearchText] = useState("");
   const tableRef = useRef<HTMLDivElement>(null);
   const router   = useRouter();
   const [defectOptions, setDefectOptions] = useState<DefectCode[]>([]);
@@ -98,16 +99,21 @@ export function ReworkStation() {
   const [users,       setUsers]       = useState<User[]>([]);
   const [receivedBy,  setReceivedBy]  = useState(""); // holds selected user id (as string, from <select>)
 
-  useEffect(() => {
+  const loadQueue = () => {
+    setLoading(true);
     fetchQueue()
       .then(data => { setQueue(data); setLoading(false); })
       .catch(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    loadQueue();
   }, []);
 
   useEffect(() => {
     if (!labelId) { setLabel(null); return; }
     fetchLabel(labelId).then(setLabel).catch(() => setLabel(null));
-    setReceivedBy(""); // reset the picker whenever a different label is looked up
+    setReceivedBy(""); // reset user selection on new lookup
   }, [labelId]);
 
   useEffect(() => {
@@ -123,23 +129,31 @@ export function ReworkStation() {
   }, []);
 
   useEffect(() => {
-    // Keep the FULL user list here (no role filter) — it's used both for the
-    // "Received By" dropdown options AND for looking up the display name of
-    // whoever already received a label. Filtering it down would break the
-    // name lookup for any label received by a user outside that role subset.
-    fetchAllUsers().then(setUsers).catch(console.error);
+    fetchAllUsers()
+      .then(data => {
+        if (Array.isArray(data)) {
+          setUsers(data);
+        } else {
+          setUsers([]);
+        }
+      })
+      .catch(err => {
+        console.error("Error fetching users:", err);
+        setUsers([]);
+      });
   }, []);
 
   // ── Filter helpers ──────────────────────────────────────────────────────────
 
-  function uniqueValues(col: ColKey): string[] {
-    return Array.from(new Set(queue.map(r => r[col] != null ? String(r[col]) : ""))).filter(Boolean).sort();
-  }
-
+function uniqueValues(col: ColKey): string[] {
+  const activeQueue = queue.filter(row => row.status === "ISSUED" || row.status === "IN_PROGRESS");
+  return Array.from(new Set(activeQueue.map(r => r[col] != null ? String(r[col]) : "–"))).sort();
+}
   function openFilter(col: ColKey) {
     if (openCol === col) { setOpenCol(null); return; }
     setDraft(filters[col] ? new Set(filters[col]) : new Set(uniqueValues(col)));
-    setSearch(""); setOpenCol(col);
+    setSearch(""); 
+    setOpenCol(col);
   }
 
   function applyFilter() {
@@ -162,16 +176,33 @@ export function ReworkStation() {
     setDraft(vals.every(v => draft.has(v)) ? new Set() : new Set(vals));
   }
 
-  const filteredQueue = queue.filter(row =>
-    (Object.entries(filters) as [ColKey, Set<string>][]).every(([col, allowed]) => allowed.has(String(row[col] ?? "")))
-  );
+  const filteredQueue = queue
+    .filter(row => row.status === "ISSUED" || row.status === "IN_PROGRESS") 
+    .filter(row =>
+      (Object.entries(filters) as [ColKey, Set<string>][]).every(([col, allowed]) => {
+        const rowVal = row[col] != null ? String(row[col]) : "–";
+        return allowed.has(rowVal);
+      })
+    )
+    .filter(row => {
+      if (!queueSearchText) return true;
+      const q = queueSearchText.toLowerCase();
+            return (
+        String(row.order_id || "").toLowerCase().includes(q) ||
+        String(row.material_id || "").toLowerCase().includes(q) ||
+        String(row.description || "").toLowerCase().includes(q)
+      );
+    });
 
   const isActive = (col: ColKey) => !!filters[col];
 
   // ── Action handlers ─────────────────────────────────────────────────────────
 
   async function handleReceive() {
-    if (!receivedBy) return;
+    if (!receivedBy) {
+      alert("กรุณาเลือกชื่อผู้รับงานก่อนดำเนินการ");
+      return;
+    }
     const receivedByIdNum   = Number(receivedBy);
     const receivedByName    = users.find(u => u.id === receivedByIdNum)?.username ?? "";
     try {
@@ -181,26 +212,54 @@ export function ReworkStation() {
         receivedById:  receivedByIdNum,
         receivedBy:    receivedByName,
       });
-      setLabel(prev => prev ? { ...prev, status: "IN_PROGRESS", received_at: new Date().toISOString(), received_by_id: receivedByIdNum } : prev);
+      
+      setLabel(prev => prev ? { 
+        ...prev, 
+        status: "IN_PROGRESS", 
+        received_at: new Date().toISOString(), 
+        received_by_id: receivedByIdNum,
+        received_by: receivedByName
+      } : prev);
+      
       setQueue(prev => prev.map(r => r.label_id === labelId ? { ...r, status: "IN_PROGRESS" } : r));
       setReceivedId(labelId);
       setShowReceived(true);
       setTimeout(() => setShowReceived(false), 2000);
     } catch (err) {
-      console.error(err);
-      // TODO: replace with toast
+      console.error("Error on receiving label:", err);
     }
   }
 
   async function handleCompleteReturn() {
+    if (!receivedBy) {
+      alert("กรุณาเลือกชื่อผู้ส่งคืนงานก่อนดำเนินการ");
+      return;
+    }
+    
+    const returnedByIdNum = Number(receivedBy);
+    const returnedByName  = users.find(u => u.id === returnedByIdNum)?.username ?? "";
+
     try {
-      await updateLabel(labelId, { status: "RETURNED", returnedDate: formatDate() });
-      setLabel(prev => prev ? { ...prev, status: "RETURNED", returned_at: new Date().toISOString() } : prev);
-      setQueue(prev => prev.filter(r => r.label_id !== labelId));
+      await updateLabel(labelId, { 
+        status: "RETURNED", 
+        returnedDate: formatDate(),
+        returnedById: returnedByIdNum,
+        returnedBy: returnedByName
+      });
+      
       setShowConfirm(false);
+      setLabel(null); 
+      setReceivedBy(""); 
+      setLabelId(""); // Clear Lookup view so it goes back to clean default.
+      
+      // Update queue locally & reload latest items from Server API directly
+      setQueue(prev => prev.filter(r => r.label_id !== labelId));
+      if (typeof fetchQueue === 'function') {
+        fetchQueue().then(setQueue).catch(console.error);
+      }
+
     } catch (err) {
-      console.error(err);
-      // TODO: replace with toast
+      console.error("Error on completing label:", err);
     }
   }
 
@@ -243,23 +302,24 @@ export function ReworkStation() {
           {label && (() => {
             const isJustReceived = receivedId === labelId;
             const status         = label.status;
-            const receivedByName = users.find(u => u.id === label.received_by_id)?.username ?? "–";
+            const receivedByName = users.find(u => u.id === label.received_by_id)?.username || label.received_by || "–";
+            const returnedByName = users.find(u => u.id === label.returned_by_id)?.username || label.returned_by || "–";
 
             return (
               <div style={{ background: "#F9FAFB", border: "0.5px solid #E5E7EB", borderRadius: 8, padding: 16, display: "flex", gap: 24 }}>
 
                 {/* Detail grid */}
-                <div style={{ flex: 1, display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "10px 24px" }}>
-                  <DetailField label="Label ID"    value={label.label_id}                          />
-                  <DetailField label="Order no."   value={label.order_id}                          />
-                  <DetailField label="Material ID" value={label.material_id ?? "–"}                />
-                  <DetailField label="Description" value={label.description  ?? "–"}               />
-                  <DetailField label="Line Post"   value={label.line_post  ?? "–"}                 />
-                  <DetailField label="Prog Plan"   value={label.prog_plan  ?? "–"}                 />
-                  <DetailField label="QC After P"  value={label.qc_after_p  ?? "–"}                />
+                <div style={{ flex: 1, display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: "10px 24px" }}>
+                  <DetailField label="Label ID"    value={label.label_id}                                    />
+                  <DetailField label="Order no."   value={label.order_id}                                    />
+                  <DetailField label="Material ID" value={label.material_id ?? "–"}                         />
+                  <DetailField label="Description" value={label.description  ?? "–"}                        />
+                  <DetailField label="Line Post"   value={label.line_post  ?? "–"}                          />
+                  <DetailField label="Prog Plan"   value={label.prog_plan  ?? "–"}                          />
+                  <DetailField label="QC After P"  value={label.qc_after_p  ?? "–"}                         />
+                  <DetailField label="Pack WK"     value={label.pack_wk  ?? "–"}                          />
                   <DetailField label="RW Qty"      value={String(label.input_qty)} color="#DC2626" />
-                  <DetailField label="Pack WK"     value={label.pack_wk  ?? "–"}                 />
-                  <DetailField label="Round"       value={String(label.round_no)}                  />
+                  <DetailField label="Round"       value={String(label.round_no)}                                    />
                   <div><p style={labelCss}>Status</p><StatusPill status={status} /></div>
 
                   <div style={{ gridColumn: "1 / -1", display: "flex", flexWrap: "wrap", gap: 4 }}>
@@ -277,10 +337,11 @@ export function ReworkStation() {
                   <div style={{ gridColumn: "1 / -1" }}>
                     <DetailField label="Remark" value={label.remark || "–"} />
                   </div>
-                  <DetailField label="QC Name" value={label.qc_name || "–"} />
+                  <DetailField label="QC Name"       value={label.qc_name || "–"} />
                   <DetailField label="Issued Date"   value={formatDateFromISO(label.issued_at)   || "–"} />
                   <DetailField label="Received By"   value={receivedByName} />
                   <DetailField label="Received Date" value={formatDateFromISO(label.received_at) || "–"} />
+                  <DetailField label="Returned By"   value={returnedByName} />
                   <DetailField label="Returned Date" value={formatDateFromISO(label.returned_at) || "–"} />
                 </div>
 
@@ -296,20 +357,37 @@ export function ReworkStation() {
                     </div>
                   )}
 
-                  {/* Received By picker — only relevant while still ISSUED (about to receive) */}
-                  {status === "ISSUED" && !isJustReceived && (
+                  {/* Dropdown Select (Disabled only if layout status is closed or returned) */}
+                  {(status === "ISSUED" || status === "IN_PROGRESS" || isJustReceived) && status !== "RETURNED" && (
                     <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                      <p style={{ fontSize: 11, color: "#000000", fontWeight: 500 }}>Received By</p>
+                      <p style={{ fontSize: 11, color: "#000000", fontWeight: 500 }}>
+                        {status === "ISSUED" ? "Received By" : "Returned By"}
+                      </p>
                       <div style={{ position: "relative" }}>
                         <select
                           value={receivedBy}
                           onChange={e => setReceivedBy(e.target.value)}
-                          style={{ width: "100%", height: 38, padding: "0 32px 0 10px", fontSize: 13, color: receivedBy ? "#000000" : "#8C8985", background: "#fff", border: "0.5px solid #E5E7EB", borderRadius: 8, outline: "none", appearance: "none", boxSizing: "border-box", fontFamily: "Inter, sans-serif", cursor: "pointer" }}
+                          disabled={status !== "ISSUED" && status !== "IN_PROGRESS" && !isJustReceived}
+                          style={{ 
+                            width: "100%", 
+                            height: 38, 
+                            padding: "0 32px 0 10px", 
+                            fontSize: 13, 
+                            color: receivedBy ? "#000000" : "#8C8985", 
+                            background: (status === "ISSUED" || status === "IN_PROGRESS" || isJustReceived) ? "#fff" : "#F3F4F6", 
+                            border: "0.5px solid #E5E7EB", 
+                            borderRadius: 8, 
+                            outline: "none", 
+                            appearance: "none", 
+                            boxSizing: "border-box", 
+                            fontFamily: "Inter, sans-serif", 
+                            cursor: (status === "ISSUED" || status === "IN_PROGRESS" || isJustReceived) ? "pointer" : "not-allowed" 
+                          }}
                           onFocus={e => (e.target.style.borderColor = "#8DBAED")}
                           onBlur={e  => (e.target.style.borderColor = "#E5E7EB")}
                         >
                           <option value="">-</option>
-                          {users.filter(u => u.role === "rw_station" || u.role === "admin").map(u => (
+                          {users.filter(u => u.role === "rw_station").map(u => (
                             <option key={u.id} value={u.id}>{u.username}</option>
                           ))}
                         </select>
@@ -318,29 +396,31 @@ export function ReworkStation() {
                     </div>
                   )}
 
-                  {/* Receive */}
-                  <button
-                    onClick={status === "ISSUED" && !isJustReceived && receivedBy ? handleReceive : undefined}
-                    disabled={status !== "ISSUED" || isJustReceived || !receivedBy}
-                    style={{ width: "100%", height: 44, border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, fontFamily: "Inter, sans-serif",
-                      background: status === "ISSUED" && !isJustReceived && receivedBy ? "#FCCF61" : "#E5E7EB",
-                      color:      status === "ISSUED" && !isJustReceived && receivedBy ? "#fff"    : "#9CA3AF",
-                      cursor:     status === "ISSUED" && !isJustReceived && receivedBy ? "pointer" : "not-allowed",
-                      display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
-                    }}
-                  >
-                    {(status !== "ISSUED" || isJustReceived) && <CheckCircle2 size={15} color="#9CA3AF" />}
-                    {status === "ISSUED" && !isJustReceived ? "Receive" : "Received"}
-                  </button>
+                  {/* Button: Receive */}
+                  {status !== "RETURNED" && (
+                    <button
+                      onClick={status === "ISSUED" && !isJustReceived && receivedBy ? handleReceive : undefined}
+                      disabled={status !== "ISSUED" || isJustReceived || !receivedBy}
+                      style={{ width: "100%", height: 44, border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, fontFamily: "Inter, sans-serif",
+                        background: status === "ISSUED" && !isJustReceived && receivedBy ? "#FCCF61" : "#E5E7EB",
+                        color:      status === "ISSUED" && !isJustReceived && receivedBy ? "#fff"    : "#9CA3AF",
+                        cursor:     status === "ISSUED" && !isJustReceived && receivedBy ? "pointer" : "not-allowed",
+                        display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+                      }}
+                    >
+                      {(status !== "ISSUED" || isJustReceived) && <CheckCircle2 size={15} color="#9CA3AF" />}
+                      {status === "ISSUED" && !isJustReceived ? "Receive" : "Received"}
+                    </button>
+                  )}
 
-                  {/* Complete & Return */}
+                  {/* Button: Complete & Return */}
                   <button
-                    onClick={status === "IN_PROGRESS" || isJustReceived ? () => setShowConfirm(true) : undefined}
-                    disabled={status !== "IN_PROGRESS" && !isJustReceived}
+                    onClick={(status === "IN_PROGRESS" || isJustReceived) && receivedBy && status !== "RETURNED" ? () => setShowConfirm(true) : undefined}
+                    disabled={(status !== "IN_PROGRESS" && !isJustReceived) || !receivedBy || status === "RETURNED"}
                     style={{ width: "100%", height: 44, border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, fontFamily: "Inter, sans-serif",
-                      background: status === "IN_PROGRESS" || isJustReceived ? "#77BB78" : "#E5E7EB",
-                      color:      status === "IN_PROGRESS" || isJustReceived ? "#fff"    : "#9CA3AF",
-                      cursor:     status === "IN_PROGRESS" || isJustReceived ? "pointer" : "not-allowed",
+                      background: (status === "IN_PROGRESS" || isJustReceived) && receivedBy && status !== "RETURNED" ? "#77BB78" : "#E5E7EB",
+                      color:      (status === "IN_PROGRESS" || isJustReceived) && receivedBy && status !== "RETURNED" ? "#fff"    : "#9CA3AF",
+                      cursor:     (status === "IN_PROGRESS" || isJustReceived) && receivedBy && status !== "RETURNED" ? "pointer" : "not-allowed",
                       display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
                     }}
                   >
@@ -348,10 +428,11 @@ export function ReworkStation() {
                     {status === "RETURNED" ? "Completed & Returned" : "Complete & Return"}
                   </button>
 
-                  {/* Hint text */}
-                  {status === "ISSUED"       && !isJustReceived && !receivedBy && <p style={{ fontSize: 11, color: "#9CA3AF", textAlign: "center", marginTop: 2 }}>เลือกชื่อผู้รับก่อน</p>}
+                  {/* Status hint text */}
+                  {status === "ISSUED"       && !isJustReceived && !receivedBy && <p style={{ fontSize: 11, color: "#9CA3AF", textAlign: "center", marginTop: 2 }}>เลือกชื่อผู้รับ</p>}
                   {status === "ISSUED"       && !isJustReceived && receivedBy  && <p style={{ fontSize: 11, color: "#9CA3AF", textAlign: "center", marginTop: 2 }}>Complete available after receiving</p>}
-                  {status === "IN_PROGRESS"  && <p style={{ fontSize: 11, color: "#9CA3AF", textAlign: "center", marginTop: 2 }}>Complete & return to QC</p>}
+                  {status === "IN_PROGRESS"  && !receivedBy && <p style={{ fontSize: 11, color: "#9CA3AF", textAlign: "center", marginTop: 2 }}>เลือกชื่อผู้ส่งคืนงาน</p>}
+                  {status === "IN_PROGRESS"  && receivedBy && <p style={{ fontSize: 11, color: "#9CA3AF", textAlign: "center", marginTop: 2 }}>Complete & return to QC</p>}
                   {status === "RETURNED"     && <p style={{ fontSize: 11, color: "#9CA3AF", textAlign: "center", marginTop: 2 }}>Waiting for QC re-inspection</p>}
                   {status === "CLOSED"       && <p style={{ fontSize: 11, color: "#9CA3AF", textAlign: "center", marginTop: 2 }}>Order closed</p>}
                 </div>
@@ -363,17 +444,53 @@ export function ReworkStation() {
         {/* ── Queue ── */}
         <div ref={tableRef} style={{ background: "#fff", border: "0.5px solid #E5E7EB", borderRadius: 12, overflow: "visible", position: "relative" }}>
 
-          <div style={{ padding: "14px 20px", borderBottom: "0.5px solid #E5E7EB", display: "flex", alignItems: "center", gap: 8 }}>
-            <span style={{ fontSize: 13, fontWeight: 600, color: "#8C8985", letterSpacing: "0.06em" }}>QUEUE</span>
-            <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 18, height: 18, borderRadius: 999, background: "#DC2626", color: "#fff", fontSize: 9, fontWeight: 700 }}>
-              {filteredQueue.length}
-            </span>
-            {Object.keys(filters).length > 0 && (
-              <button onClick={() => setFilters({})} style={{ marginLeft: "auto", fontSize: 12, color: "#8C8985", background: "none", border: "none", cursor: "pointer", fontFamily: "Inter, sans-serif" }}>
-                Clear all filters
-              </button>
-            )}
+          {/* Table top bar */}
+          <div style={{ padding: "14px 20px", borderBottom: "0.5px solid #E5E7EB", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
+            
+            {/* ฝั่งซ้าย: Title + Badge ตัวเลข */}
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <span style={{ fontSize: 13, fontWeight: 600, color: "#000000", letterSpacing: "0.06em" }}>QUEUE</span>
+              <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 18, height: 18, borderRadius: 999, background: "#DC2626", color: "#fff", fontSize: 9, fontWeight: 700 }}>
+                {filteredQueue.length}
+              </span>
+            </div>
+
+            {/* ฝั่งขวา: Search Box + Clear all */}
+            <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+              
+              {/* Container ของ Search Box */}
+              <div style={{ position: "relative", display: "flex", alignItems: "center" }}>
+                <input
+                  value={queueSearchText} // ⚠️ ตรวจสอบและเปลี่ยนชื่อตัวแปร State ค้นหาของหน้านี้ให้ถูกต้อง (เช่น queueSearchText หรือ searchText)
+                  onChange={e => setQueueSearchText(e.target.value)} // ⚠️ เปลี่ยนให้ตรงกับคำสั่ง set ของหน้านี้
+                  placeholder="Search..."
+                  style={{ width: 240, height: 32, padding: "0 32px 0 12px", fontSize: 13, color: "#000000", background: "#fff", border: "0.5px solid #E5E7EB", borderRadius: 8, outline: "none", boxSizing: "border-box", fontFamily: "Inter, sans-serif" }}
+                  onFocus={e => (e.target.style.borderColor = "#8DBAED")}
+                  onBlur={e  => (e.target.style.borderColor = "#E5E7EB")}
+                />
+                {/* ปุ่มกากบาทลบคำค้นหา (โชว์เมื่อมีข้อความพิมพ์อยู่) */}
+                {queueSearchText && (
+                  <button 
+                    onClick={() => setQueueSearchText("")} 
+                    style={{ position: "absolute", right: 8, background: "none", border: "none", color: "#8C8985", cursor: "pointer", fontSize: 14, fontWeight: "bold", padding: 4, display: "flex", alignItems: "center", justifyContent: "center" }}
+                  >
+                    ×
+                  </button>
+                )}
+              </div>
+
+              {/* ปุ่ม Clear all แบบไม่มีขอบ (โชว์เมื่อมีการกรองฟิลเตอร์ไว้) */}
+              {Object.keys(filters).length > 0 && (
+                <button 
+                  onClick={() => setFilters({})} 
+                  style={{ fontSize: 12, color: "#8C8985", background: "none", border: "none", cursor: "pointer", fontFamily: "Inter, sans-serif", padding: "0 4px" }}
+                >
+                  Clear all
+                </button>
+              )}
+            </div>
           </div>
+
 
           {/* Column headers */}
           <div style={{ display: "grid", gridTemplateColumns: GRID, background: "#ADCFF1", borderBottom: "1px solid #8DBAED" }}>
@@ -395,7 +512,7 @@ export function ReworkStation() {
                       <div style={{ padding: "10px 12px 8px" }}>
                         <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search..." style={{ width: "100%", height: 30, padding: "0 10px", fontSize: 12, color: "#000000", background: "#F9FAFB", border: "0.5px solid #E5E7EB", borderRadius: 6, outline: "none", boxSizing: "border-box", fontFamily: "Inter, sans-serif" }} />
                       </div>
-                      <div style={{ padding: "0 4px 4px" }}>
+                      <div style={{ padding: "0 4px 4px", maxHeight: 200, overflowY: "auto" }}>
                         <CheckRow label="All" checked={uniqueValues(col.key).every(v => draft.has(v))} onChange={toggleAll} />
                         {uniqueValues(col.key).filter(v => v.toLowerCase().includes(search.toLowerCase())).map(val => (
                           <CheckRow key={val} label={val} checked={draft.has(val)} onChange={() => toggleDraft(val)} />
@@ -434,9 +551,9 @@ export function ReworkStation() {
             >
               <Cell><span style={{ fontSize: 13, color: "#000000", fontWeight: 600 }}>{row.label_id}</span></Cell>
               <Cell><span style={{ fontSize: 12, color: "#000000" }}>{row.order_id}</span></Cell>
-              <Cell><span style={{ fontSize: 12, color: "#000000" }}>{row.material_id}</span></Cell>
-              <Cell><span style={{ fontSize: 13, color: "#000000" }}>{row.description}</span></Cell>
-              <Cell center><span style={{ fontSize: 12, color: "#000000", fontWeight: 600 }}>{row.line_post}</span></Cell>
+              <Cell><span style={{ fontSize: 12, color: "#000000" }}>{row.material_id || "–"}</span></Cell>
+              <Cell><span style={{ fontSize: 13, color: "#000000" }}>{row.description || "–"}</span></Cell>
+              <Cell center><span style={{ fontSize: 12, color: "#000000", fontWeight: 600 }}>{row.line_post || "–"}</span></Cell>
               <Cell center><span style={{ fontSize: 12, color: "#DC2626", fontWeight: 600 }}>{row.input_qty}</span></Cell>
               <Cell><StatusPill status={row.status} /></Cell>
               <Cell center><ChevronRight size={14} color="#8C8985" /></Cell>
@@ -451,7 +568,7 @@ export function ReworkStation() {
           <div style={{ background: "#fff", borderRadius: 12, padding: 24, width: 360, boxShadow: "0 8px 24px rgba(0,0,0,0.12)", fontFamily: "Inter, sans-serif" }}>
             <p style={{ fontSize: 14, fontWeight: 600, color: "#000000", marginBottom: 6 }}>ยืนยันส่งคืน QC?</p>
             <p style={{ fontSize: 12, color: "#9CA3AF", marginBottom: 16, lineHeight: 1.6 }}>
-              {label.label_id} · {label.description}<br />
+              {label.label_id} · {label.description || "–"}<br />
               RW Qty <span style={{ color: "#DC2626", fontWeight: 600 }}>{label.input_qty} ชิ้น</span>
             </p>
             <div style={{ display: "flex", gap: 8 }}>

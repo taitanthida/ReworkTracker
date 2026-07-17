@@ -1,7 +1,7 @@
 "use client";
 import { useState, useMemo, useEffect, useRef } from "react";
 import { ChevronDown } from "lucide-react";
-import { getMasterMaterials, getOpenQty } from "../../../services/qcApiService";
+import { getMasterMaterials, getOperationQty } from "../../../services/qcApi";
 
 // ── Colors ────────────────────────────────────────────────────────────────────
 
@@ -60,7 +60,9 @@ export default function Table() {
   const [isOpen, setIsOpen]     = useState(false); 
   const [colSearch, setColSearch] = useState("");
   const [draftMaterial, setDraftMaterial] = useState(new Set());   
-  const [activeMaterial, setActiveMaterial] = useState(new Set());   
+  const [activeMaterial, setActiveMaterial] = useState(new Set());
+  const [draftDate, setDraftDate] = useState(new Set());
+  const [selectedDate, setSelectedDate] = useState(new Set());   
 
   const filterRef = useRef(null);
 
@@ -79,20 +81,22 @@ export default function Table() {
 
   // Auto Refresh 
   useEffect(() => {
+    // ถ้ายูสเซอร์ยังไม่ได้เลือก Material หรือเพิ่งเปิดหน้าเว็บมา ให้ข้ามไปก่อน
     if (!activeMaterial || activeMaterial.size === 0) return;
 
     const refreshData = () => {
       const isAll = masterMaterials.every(v => activeMaterial.has(v));
       const materialQuery = isAll ? "all" : Array.from(activeMaterial).join(",");
 
-      getOpenQty(materialQuery)
+      getOperationQty(materialQuery, selectedDate)
         .then(setData)
         .catch(err => console.error("Error auto-refreshing table data:", err));
     };
 
-    const interval = setInterval(refreshData, 5 * 60 * 1000); // 5 min.
+    const interval = setInterval(refreshData, 5 * 60 * 1000);
+    
     return () => clearInterval(interval);
-  }, [materialFilterKey, masterMaterials, activeMaterial]);
+  }, [materialFilterKey, masterMaterials, activeMaterial, selectedDate]);
 
   // ปิด Dropdown เมื่อคลิกข้างนอก
   useEffect(() => {
@@ -125,6 +129,8 @@ export default function Table() {
     } else {
       setActiveMaterial(new Set(draftMaterial));
     }
+    
+    setSelectedDate(draftDate);
     setIsOpen(false);
 
     setLoading(true);
@@ -134,7 +140,7 @@ export default function Table() {
       if (!isAll && draftMaterial.size === 0) {
         setData([]);
       } else {
-        const resData = await getOpenQty(materialQuery);
+        const resData = await getOperationQty(materialQuery, draftDate);
         setData(resData);
       }
     } catch (err) {
@@ -167,14 +173,13 @@ export default function Table() {
       const colKey = `${getGroup(d.ProgressPlanning)}||${d.ProgressPlanning}`;
       if (!map[d.Order]) map[d.Order] = {};
       if (!map[d.Order][colKey]) map[d.Order][colKey] = { star: 0, blank: 0 };
-      if (d.StatusSTAR === "STAR") map[d.Order][colKey].star  += d.OpenQuantity;
-      else                         map[d.Order][colKey].blank += d.OpenQuantity;
+      if (d.StatusSTAR === "STAR") map[d.Order][colKey].star  += d.OperationQuantity;
+      else                         map[d.Order][colKey].blank += d.OperationQuantity;
     });
     return map;
   }, [filtered]);
 
   const COL_W          = 90;
-  const needsScroll    = colKeys.length > 8;
   const stickyLeft     = { position: "sticky", left: 0, zIndex: 2, background: C.headerBg };
   const stickyLeftBody = (bg) => ({ position: "sticky", left: 0, zIndex: 1, background: bg });
 
@@ -213,67 +218,94 @@ export default function Table() {
             QC Dashboard
           </h1>
 
-          <div ref={filterRef} style={{ position: "relative" }}>
-            <button onClick={openFilter}
-              style={{ height: 34, padding: "0 12px", display: "flex", alignItems: "center", gap: 6,
-                background: C.white, border: `0.5px solid ${activeMaterial ? C.accent : C.border}`,
-                borderRadius: 8, fontSize: 12, color: C.text, cursor: "pointer", fontFamily: "Inter, sans-serif" }}>
-              <span>Material</span>
-              {activeMaterial && (
-                <span style={{ background: C.accent, color: "#fff", borderRadius: 999, fontSize: 10, padding: "1px 6px", fontWeight: 600 }}>
-                  {activeMaterial.size}
-                </span>
-              )}
-              <ChevronDown size={12} color={C.textMuted} />
-            </button>
+            {/* ── เมนู Material Dropdown ── */}
+            <div ref={filterRef} style={{ position: "relative" }}>
+              <button onClick={openFilter}
+                style={{ height: 34, padding: "0 12px", display: "flex", alignItems: "center", gap: 6,
+                  background: C.white, border: `0.5px solid ${(activeMaterial && activeMaterial.size > 0) || selectedDate ? C.accent : C.border}`,
+                  borderRadius: 8, fontSize: 12, color: C.text, cursor: "pointer", fontFamily: "Inter, sans-serif" }}>
+                <span>Material</span>
+                {activeMaterial && activeMaterial.size > 0 && (
+                  <span style={{ background: C.accent, color: "#fff", borderRadius: 999, fontSize: 10, padding: "1px 6px", fontWeight: 600 }}>
+                    {activeMaterial.size}
+                  </span>
+                )}
+                <ChevronDown size={12} color={C.textMuted} />
+              </button>
 
-            {isOpen && (
-              <div style={{ position: "absolute", top: "calc(100% + 4px)", right: 0, zIndex: 100,
-                background: "#fff", border: "1px solid #E5E7EB", borderRadius: 8,
-                minWidth: 200, boxShadow: "0 4px 12px rgba(0,0,0,0.08)", overflow: "hidden" }}>
+              {isOpen && (
+                <div style={{ position: "absolute", top: "calc(100% + 4px)", right: 0, zIndex: 100,
+                  background: "#fff", border: "1px solid #E5E7EB", borderRadius: 8,
+                  minWidth: 220, boxShadow: "0 4px 12px rgba(0,0,0,0.08)", overflow: "hidden" }}>
 
-                <div style={{ padding: "10px 12px 8px" }}>
-                  <input value={colSearch} onChange={e => setColSearch(e.target.value)} placeholder="Search Material..."
-                    style={{ width: "100%", height: 30, padding: "0 10px", fontSize: 12, color: C.text,
-                      background: "#F9FAFB", border: `0.5px solid ${C.border}`, borderRadius: 6,
-                      outline: "none", boxSizing: "border-box", fontFamily: "Inter, sans-serif" }} />
-                </div>
+                  <div style={{ padding: "12px 12px 8px", borderBottom: `0.5px solid ${C.border}`, display: "flex", flexDirection: "column", gap: 4 }}>
+                    <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                      <input
+                        type="date"
+                        value={draftDate}
+                        onChange={(e) => setDraftDate(e.target.value)}
+                        style={{
+                          width: "100%",
+                          height: 30,
+                          padding: "0 8px",
+                          borderRadius: 6,
+                          border: `0.5px solid ${C.border}`,
+                          fontSize: 12,
+                          outline: "none",
+                          boxSizing: "border-box",
+                          fontFamily: "Inter, sans-serif",
+                          color: C.text
+                        }}
+                      />
+                    </div>
+                  </div>
 
-                <div style={{ padding: "0 4px 4px", maxHeight: 200, overflowY: "auto" }}>
-                  <CheckRow
-                    label="All"
-                    checked={masterMaterials.every(v => draftMaterial.has(v))}
-                    onChange={toggleAll}
-                  />
-                  {masterMaterials.filter(v => v.toString().toLowerCase().includes(colSearch.toLowerCase())).map(v => (
-                    <CheckRow 
-                      key={v} 
-                      label={v} 
-                      checked={draftMaterial.has(v)} 
-                      onChange={() => {
-                        setDraftMaterial(prev => {
-                          const n = new Set(prev);
-                          n.has(v) ? n.delete(v) : n.add(v);
-                          return n;
-                        });
-                      }} 
+                  <div style={{ padding: "10px 12px 8px" }}>
+                    <input value={colSearch} onChange={e => setColSearch(e.target.value)} placeholder="Search Material..."
+                      style={{ width: "100%", height: 30, padding: "0 10px", fontSize: 12, color: C.text,
+                        background: "#F9FAFB", border: `0.5px solid ${C.border}`, borderRadius: 6,
+                        outline: "none", boxSizing: "border-box", fontFamily: "Inter, sans-serif" }} />
+                  </div>
+
+                  <div style={{ padding: "0 4px 4px", maxHeight: 180, overflowY: "auto" }}>
+                    <CheckRow
+                      label="All"
+                      checked={masterMaterials.length > 0 && masterMaterials.every(v => draftMaterial.has(v))}
+                      onChange={toggleAll}
                     />
-                  ))}
-                </div>
+                    {masterMaterials.filter(v => v.toString().toLowerCase().includes(colSearch.toLowerCase())).map(v => (
+                      <CheckRow 
+                        key={v} 
+                        label={v} 
+                        checked={draftMaterial.has(v)} 
+                        onChange={() => {
+                          setDraftMaterial(prev => {
+                            const n = new Set(prev);
+                            n.has(v) ? n.delete(v) : n.add(v);
+                            return n;
+                          });
+                        }} 
+                      />
+                    ))}
+                  </div>
 
-                <div style={{ padding: "8px 12px 10px", borderTop: `0.5px solid ${C.border}`, display: "flex", justifyContent: "space-between" }}>
-                  <button onClick={() => setDraftMaterial(new Set())}
-                    style={{ fontSize: 12, color: C.textMuted, background: "none", border: "none", cursor: "pointer", fontFamily: "Inter, sans-serif" }}>
-                    Clear
-                  </button>
-                  <button onClick={applyFilter}
-                    style={{ height: 28, padding: "0 14px", background: C.accent, color: "#fff", border: "none", borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "Inter, sans-serif" }}>
-                    Apply
-                  </button>
+                  <div style={{ padding: "8px 12px 10px", borderTop: `0.5px solid ${C.border}`, display: "flex", justifyContent: "space-between" }}>
+                    <button 
+                      onClick={() => {
+                        setDraftMaterial(new Set());
+                      }}
+                      style={{ fontSize: 12, color: C.textMuted, background: "none", border: "none", cursor: "pointer", fontFamily: "Inter, sans-serif" }}
+                    >
+                      Clear
+                    </button>
+                    <button onClick={applyFilter}
+                      style={{ height: 28, padding: "0 14px", background: C.accent, color: "#fff", border: "none", borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "Inter, sans-serif" }}>
+                      Apply
+                    </button>
+                  </div>
                 </div>
-              </div>
-            )}
-          </div>
+              )}
+            </div>
         </div>
 
         {/* custom-scrollbar */}
@@ -286,7 +318,7 @@ export default function Table() {
             </div>
           )}
 
-          <table style={{ fontSize: 12, borderCollapse: "separate", borderSpacing: 0, fontFamily: "Inter, sans-serif", tableLayout: "fixed", width: needsScroll ? "max-content" : "100%"}}>
+          <table style={{ fontSize: 12, borderCollapse: "separate", borderSpacing: 0, fontFamily: "Inter, sans-serif", tableLayout: "fixed", width: "100%", minWidth: "max-content"}}>
             <colgroup>
               <col style={{ width: 160 }} />
               {colKeys.map(c => <col key={c.key} style={{ width: COL_W }} />)}

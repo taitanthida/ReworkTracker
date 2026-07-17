@@ -74,6 +74,7 @@ export function CreateReworkLabel() {
   const [retFilters, setRetFilters] = useState<Partial<Record<RetColKey, Set<string>>>>({});
   const [retDraft,   setRetDraft]   = useState<Set<string>>(new Set());
   const [retSearch,  setRetSearch]  = useState("");
+  const [retSearchText, setRetSearchText] = useState("");
   const retTableRef = useRef<HTMLDivElement>(null);
 
   // ── Print area ref — used to grab the label markup and print it in its own window ──
@@ -148,9 +149,19 @@ export function CreateReworkLabel() {
     setRetDraft(vals.every(v => retDraft.has(v)) ? new Set() : new Set(vals));
   }
 
-  const filteredReturned = returnedLabels.filter(row =>
-    (Object.entries(retFilters) as [RetColKey, Set<string>][]).every(([col, allowed]) => allowed.has(String(row[col])))
-  );
+  const filteredReturned = returnedLabels
+    .filter(row =>
+      (Object.entries(retFilters) as [RetColKey, Set<string>][]).every(([col, allowed]) => allowed.has(String(row[col])))
+    )
+    .filter(row => {
+      if (!retSearchText) return true;
+      const q = retSearchText.toLowerCase();
+      return (
+        String(row.order_id || "").toLowerCase().includes(q) ||
+        String(row.material_id || "").toLowerCase().includes(q) ||
+        String(row.description || "").toLowerCase().includes(q)
+      );
+    });
 
   const isRetActive = (col: RetColKey) => !!retFilters[col];
 
@@ -432,7 +443,7 @@ export function CreateReworkLabel() {
                 <button style={qrBtnStyle}><Search size={16} /></button>
               </div>
               {info && (
-                <div style={{ background: "#F9FAFB", border: "0.5px solid #E5E7EB", borderRadius: 8, padding: 16, display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px 24px" }}>
+                <div style={{ background: "#F9FAFB", border: "0.5px solid #E5E7EB", borderRadius: 8, padding: 16, display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "12px 24px" }}>
                   <InfoField label="Order no."    value={orderNo} />
                   <InfoField label="Material ID"  value={info.materialId} />
                   <InfoField label="Description"  value={info.description} />
@@ -452,7 +463,7 @@ export function CreateReworkLabel() {
             {/* Inspection result */}
             <Card>
               <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
-                <p style={{ fontSize: 11, fontWeight: 600, color: "#8C8985", letterSpacing: "0.06em", textTransform: "uppercase", margin: 0 }}>
+                <p style={{ fontSize: 11, fontWeight: 600, color: "#000000", letterSpacing: "0.06em", textTransform: "uppercase", margin: 0 }}>
                   Inspection result
                 </p>
                 <span style={{ display: "inline-flex", alignItems: "center", padding: "2px 10px", borderRadius: 999, background: "#8DBAED", color: "#fff", fontSize: 12, fontWeight: 600 }}>
@@ -551,7 +562,7 @@ export function CreateReworkLabel() {
 
             {/* Header */}
             <div style={{ padding: "14px 16px", borderBottom: "0.5px solid #E5E7EB" }}>
-              <p style={{ fontSize: 11, fontWeight: 600, color: "#8C8985", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>
+              <p style={{ fontSize: 11, fontWeight: 600, color: "#000000", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>
                 Create Rework Label
               </p>
               {panelId ? (
@@ -666,16 +677,51 @@ export function CreateReworkLabel() {
 
         {/* ── Returned queue ── */}
         <div ref={retTableRef} style={{ background: "#fff", border: "0.5px solid #E5E7EB", borderRadius: 12, overflow: "visible", position: "relative" }}>
-          <div style={{ padding: "14px 20px", borderBottom: "0.5px solid #E5E7EB", display: "flex", alignItems: "center", gap: 8 }}>
-            <span style={{ fontSize: 13, fontWeight: 600, color: "#8C8985" }}>RETURNED – awaiting re-inspection</span>
-            <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 18, height: 18, borderRadius: 999, background: "#DC2626", color: "#fff", fontSize: 9, fontWeight: 700 }}>
-              {filteredReturned.length}
-            </span>
-            {Object.keys(retFilters).length > 0 && (
-              <button onClick={() => setRetFilters({})} style={{ marginLeft: "auto", fontSize: 12, color: "#8C8985", background: "none", border: "none", cursor: "pointer", fontFamily: "Inter, sans-serif" }}>
-                Clear all filters
-              </button>
-            )}
+
+          {/* Table top bar */}
+          <div style={{ padding: "14px 20px", borderBottom: "0.5px solid #E5E7EB", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
+            
+            {/* Title + Badge */}
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <span style={{ fontSize: 13, fontWeight: 600, color: "#000000" }}>RETURNED – awaiting re-inspection</span>
+              <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 18, height: 18, borderRadius: 999, background: "#DC2626", color: "#fff", fontSize: 9, fontWeight: 700 }}>
+                {filteredReturned.length}
+              </span>
+            </div>
+
+            {/* Search Box + Clear all */}
+            <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+              
+              {/* Container ของ Search Box */}
+              <div style={{ position: "relative", display: "flex", alignItems: "center" }}>
+                <input
+                  value={retSearchText}
+                  onChange={e => setRetSearchText(e.target.value)}
+                  placeholder="Search..."
+                  style={{ width: 240, height: 32, padding: "0 32px 0 12px", fontSize: 13, color: "#000000", background: "#fff", border: "0.5px solid #E5E7EB", borderRadius: 8, outline: "none", boxSizing: "border-box", fontFamily: "Inter, sans-serif" }}
+                  onFocus={e => (e.target.style.borderColor = "#8DBAED")}
+                  onBlur={e  => (e.target.style.borderColor = "#E5E7EB")}
+                />
+                {retSearchText && (
+                  <button 
+                    onClick={() => setRetSearchText("")} 
+                    style={{ position: "absolute", right: 8, background: "none", border: "none", color: "#8C8985", cursor: "pointer", fontSize: 14, fontWeight: "bold", padding: 4, display: "flex", alignItems: "center", justifyContent: "center" }}
+                  >
+                    ×
+                  </button>
+                )}
+              </div>
+
+              {/* ปุ่ม Clear all */}
+              {Object.keys(retFilters).length > 0 && (
+                <button 
+                  onClick={() => setRetFilters({})} 
+                  style={{ fontSize: 12, color: "#8C8985", background: "none", border: "none", cursor: "pointer", fontFamily: "Inter, sans-serif", padding: "0 4px" }}
+                >
+                  Clear all
+                </button>
+              )}
+            </div>
           </div>
 
           {/* Column headers */}
@@ -932,7 +978,7 @@ function Card({ children }: { children: ReactNode }) {
   return <div style={{ background: "#fff", border: "0.5px solid #E5E7EB", borderRadius: 8, padding: 20 }}>{children}</div>;
 }
 function SectionLabel({ children }: { children: ReactNode }) {
-  return <p style={{ fontSize: 11, fontWeight: 600, color: "#8C8985", letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 12 }}>{children}</p>;
+  return <p style={{ fontSize: 11, fontWeight: 600, color: "#000000", letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 12 }}>{children}</p>;
 }
 function InfoField({ label, value }: { label: string; value: string }) {
   return <div><p style={{ fontSize: 10, color: "#8C8985", marginBottom: 2 }}>{label}</p><p style={{ fontSize: 13, color: "#000000" }}>{value}</p></div>;

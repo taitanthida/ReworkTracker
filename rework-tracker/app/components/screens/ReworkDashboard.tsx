@@ -432,70 +432,101 @@ export function ReworkDashboard() {
           <MetricCard icon={<XCircle       size={16} color="#4C1D95" />} iconBg="#EDE9FE" iconBorder="#DDD6FE" label="Closed"        value={closedCount}     valueCss={{ color: "#4C1D95" }} cardCss={{ background: "#F5F3FF", borderColor: "#DDD6FE" }} labelCss={{ color: "#6D28D9" }} />
         </div>
 
-        {/* ── All rework orders table ── */}
+       {/* ── All rework orders table ── */}
         <div ref={tableRef} style={{ background: "#fff", border: "0.5px solid #E5E7EB", borderRadius: 12, overflow: "visible", position: "relative", marginBottom: 16 }}>
 
           {/* Table top bar */}
-          <div style={{ padding: "14px 20px 12px", borderBottom: "0.5px solid #E5E7EB", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-            <span style={{ fontSize: 13, fontWeight: 600, color: "#8C8985" }}>All rework orders</span>
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              {hasFilters && (
-                <button onClick={clearAllFilters} style={{ fontSize: 12, color: "#8C8985", background: "none", border: "0.5px solid #E5E7EB", borderRadius: 6, padding: "2px 10px", cursor: "pointer", fontFamily: "Inter, sans-serif" }}>Clear filters</button>
-              )}
-              {(expandedOrders.size > 0 || expandedLabels.size > 0) && (
-                <button onClick={() => { setExpandedOrders(new Set()); setExpandedLabels(new Set()); }} style={{ fontSize: 12, color: "#8C8985", background: "none", border: "0.5px solid #E5E7EB", borderRadius: 6, padding: "2px 10px", cursor: "pointer", fontFamily: "Inter, sans-serif" }}>Collapse all</button>
-              )}
-            </div>
-          </div>
-
-          {/* Search + quick status filters */}
-          <div style={{ padding: "12px 20px", borderBottom: "0.5px solid #E5E7EB", display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-            <input
-              value={searchText}
-              onChange={e => setSearchText(e.target.value)}
-              placeholder="Search..."
-              style={{ flex: "1 1 240px", minWidth: 200, height: 36, padding: "0 12px", fontSize: 13, color: "#000000", background: "#fff", border: "0.5px solid #E5E7EB", borderRadius: 8, outline: "none", boxSizing: "border-box", fontFamily: "Inter, sans-serif" }}
-              onFocus={e => (e.target.style.borderColor = "#8DBAED")}
-              onBlur={e  => (e.target.style.borderColor = "#E5E7EB")}
-            />
-            <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
-              {([
-                { key: "ALL" as const,         label: "All" },
-                { key: "ISSUED" as const,      label: "Issued" },
-                { key: "IN_PROGRESS" as const, label: "In Progress" },
-                { key: "RETURNED" as const,    label: "Returned" },
-                { key: "CLOSED" as const,      label: "Closed" },
-              ]).map(opt => {
-                const active = quickStatus.has(opt.key);
-                return (
-                  <button
-                    key={opt.key}
-                    onClick={() => {
-                      setQuickStatus(prev => {
-                        const next = new Set(prev);
-                        if (opt.key === "ALL") return new Set(["ALL"]);
-                        next.delete("ALL");
-                        if (next.has(opt.key)) {
-                          next.delete(opt.key);
-                          if (next.size === 0) return new Set(["ALL"]);
-                        } else {
-                          next.add(opt.key);
-                        }
-                        return next;
-                      });
-                    }}
-                    style={{
-                      height: 32, padding: "0 14px", borderRadius: 999, fontSize: 12, fontWeight: 600,
-                      cursor: "pointer", fontFamily: "Inter, sans-serif",
-                      background: active ? "#8DBAED" : "#fff",
-                      color: active ? "#fff" : "#8C8985",
-                      border: active ? "0.5px solid #8DBAED" : "0.5px solid #E5E7EB",
-                    }}
+          <div style={{ padding: "14px 20px", borderBottom: "0.5px solid #E5E7EB", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
+            
+            {/* ฝั่งซ้าย: Title */}
+            <span style={{ fontSize: 13, fontWeight: 600, color: "#000000" }}>All rework orders</span>
+            
+            {/* ฝั่งขวา: Search Box + Quick Filters + Clear all */}
+            <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+              
+              {/* Container ของ Search Box เพื่อทำปุ่มกากบาทริมขวา */}
+              <div style={{ position: "relative", display: "flex", alignItems: "center" }}>
+                <input
+                  value={searchText}
+                  onChange={e => setSearchText(e.target.value)}
+                  placeholder="Search..."
+                  style={{ width: 240, height: 32, padding: "0 32px 0 12px", fontSize: 13, color: "#000000", background: "#fff", border: "0.5px solid #E5E7EB", borderRadius: 8, outline: "none", boxSizing: "border-box", fontFamily: "Inter, sans-serif" }}
+                  onFocus={e => (e.target.style.borderColor = "#8DBAED")}
+                  onBlur={e  => (e.target.style.borderColor = "#E5E7EB")}
+                />
+                {/* ปุ่ม Clear Filter (X) ในช่องค้นหา จะขึ้นเมื่อมีข้อความเท่านั้น */}
+                {searchText && (
+                  <button 
+                    onClick={() => setSearchText("")} 
+                    style={{ position: "absolute", right: 8, background: "none", border: "none", color: "#8C8985", cursor: "pointer", fontSize: 14, fontWeight: "bold", padding: 4, display: "flex", alignItems: "center", justifyContent: "center" }}
+                    title="Clear search"
                   >
-                    {opt.label}
+                    ×
                   </button>
-                );
-              })}
+                )}
+              </div>
+              
+              {/* Quick status filters */}
+              <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                {([
+                  { key: "ALL" as const,         label: "All" },
+                  { key: "ISSUED" as const,      label: "Issued" },
+                  { key: "IN_PROGRESS" as const, label: "In Progress" },
+                  { key: "RETURNED" as const,    label: "Returned" },
+                  { key: "CLOSED" as const,      label: "Closed" },
+                ]).map(opt => {
+                  const active = quickStatus.has(opt.key);
+                  return (
+                    <button
+                      key={opt.key}
+                      onClick={() => {
+                        setQuickStatus(prev => {
+                          const next = new Set(prev);
+                          if (opt.key === "ALL") return new Set(["ALL"]);
+                          next.delete("ALL");
+                          if (next.has(opt.key)) {
+                            next.delete(opt.key);
+                            if (next.size === 0) return new Set(["ALL"]);
+                          } else {
+                            next.add(opt.key);
+                          }
+                          return next;
+                        });
+                      }}
+                      style={{
+                        height: 32, padding: "0 14px", borderRadius: 999, fontSize: 12, fontWeight: 600,
+                        cursor: "pointer", fontFamily: "Inter, sans-serif",
+                        background: active ? "#8DBAED" : "#fff",
+                        color: active ? "#fff" : "#8C8985",
+                        border: active ? "0.5px solid #8DBAED" : "0.5px solid #E5E7EB",
+                      }}
+                    >
+                      {opt.label}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* ปุ่ม Clear all ขวาสุด */}
+              {hasFilters && (
+                <button 
+                  onClick={() => {
+                    clearAllFilters();              
+                    setExpandedOrders(new Set());     
+                    setExpandedLabels(new Set());      
+                  }} 
+                  style={{ 
+                    fontSize: 12, 
+                    color: "#8C8985", 
+                    background: "none", 
+                    border: "none", 
+                    cursor: "pointer", 
+                    fontFamily: "Inter, sans-serif" 
+                  }}
+                >
+                  Clear all
+                </button>
+              )}
             </div>
           </div>
 
@@ -757,13 +788,13 @@ export function ReworkDashboard() {
           {showLog && (
             <div style={{ background: "#fff", border: "0.5px solid #E5E7EB", borderRadius: 12, overflow: "hidden" }}>
               <div style={{ padding: "14px 20px 12px", borderBottom: "0.5px solid #E5E7EB", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                <span style={{ fontSize: 13, fontWeight: 600, color: "#8C8985" }}>Rework Log</span>
+                <span style={{ fontSize: 13, fontWeight: 600, color: "#000000" }}>Rework Log</span>
                 <ExportBtn />
               </div>
               <div style={{ overflowX: "auto" }}>
 
                 {/* Log header */}
-                <div style={{ display: "grid", gridTemplateColumns: LOG_COLS, background: "#F9FAFB", borderBottom: "1px solid #E5E7EB", minHeight: 44, alignItems: "center" }}>
+                <div style={{ display: "grid", gridTemplateColumns: LOG_COLS, background: "#E5E7EB", borderBottom: "1px solid #E5E7EB", minHeight: 44, alignItems: "center" }}>
                   {LOG_HEADERS.map(h => (
                     <div key={h.label} style={{ ...TH_BASE, padding: "0 8px", textAlign: h.center ? "center" : "left", color: h.color ?? "#000000", background: h.bg ?? "transparent", display: "flex", flexDirection: "column", alignItems: h.center ? "center" : "flex-start", justifyContent: "center", alignSelf: "stretch", gap: 1 }}>
                       <span>{h.label}</span>
