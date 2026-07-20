@@ -20,8 +20,8 @@ const COLS: { key: ColKey; label: string; width: string; center?: boolean }[] = 
   { key: "order_id",    label: "Order",       width: "120px"              },
   { key: "material_id", label: "Material ID", width: "120px"              },
   { key: "description", label: "Description", width: "1fr"                },
-  { key: "line_post",   label: "Line Post",   width: "80px",  center: true },
-  { key: "input_qty",   label: "RW Qty",      width: "60px",  center: true },
+  { key: "line_post",   label: "Line Post",   width: "120px",  center: true },
+  { key: "input_qty",   label: "RW Qty",      width: "80px",  center: true },
   { key: "status",      label: "Status",      width: "120px"              },
 ];
 

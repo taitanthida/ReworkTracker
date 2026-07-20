@@ -90,8 +90,8 @@ export async function GET(
 
     const [rows]: any = await dbPool.execute(sql, [id]);
 
-    if (rows.length === 0) {
-      return NextResponse.json({ error: "Label not found" }, { status: 404 });
+    if (id === "queue" || id === "next-id") {
+      return new NextResponse(null, { status: 404 }); 
     }
 
     const row = rows[0];

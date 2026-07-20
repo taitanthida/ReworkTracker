@@ -17,8 +17,8 @@ const RET_COLS: { key: RetColKey; label: string; width: string; center?: boolean
   { key: "order_id",    label: "Order",       width: "120px"              },
   { key: "material_id", label: "Material ID", width: "120px"              },
   { key: "description", label: "Description", width: "1fr"                },
-  { key: "line_post",   label: "Line Post",   width: "80px", center: true },
-  { key: "input_qty",   label: "Qty",         width: "60px", center: true },
+  { key: "line_post",   label: "Line Post",   width: "120px", center: true },
+  { key: "input_qty",   label: "Qty",         width: "80px", center: true },
 ];
 
 const RET_GRID = RET_COLS.map(c => c.width).join(" ") + " 110px 20px";
@@ -472,7 +472,7 @@ export function CreateReworkLabel() {
                 {isReturned && <span style={{ fontSize: 12, color: "#8DBAED" }}>(re-inspection)</span>}
                 <button
                   onClick={() => { if (isReturned) handleDeselect(); else clearLeft(); }}
-                  style={{ marginLeft: "auto", height: 28, padding: "0 12px", background: "none", border: "0.5px solid #E5E7EB", borderRadius: 6, fontSize: 12, color: "#8C8985", cursor: "pointer", fontFamily: "Inter, sans-serif" }}
+                  style={{ marginLeft: "auto", height: 28, padding: "0 12px", background: "none", border: "0.5px solid #E5E7EB", borderRadius: 6, fontSize: 12, color: "#000000", cursor: "pointer", fontFamily: "Inter, sans-serif" }}
                 >
                   {isReturned ? "Deselect" : "Clear"}
                 </button>
@@ -716,7 +716,7 @@ export function CreateReworkLabel() {
               {Object.keys(retFilters).length > 0 && (
                 <button 
                   onClick={() => setRetFilters({})} 
-                  style={{ fontSize: 12, color: "#8C8985", background: "none", border: "none", cursor: "pointer", fontFamily: "Inter, sans-serif", padding: "0 4px" }}
+                  style={{ fontSize: 12, color: "#000000", background: "none", border: "none", cursor: "pointer", fontFamily: "Inter, sans-serif", padding: "0 4px" }}
                 >
                   Clear all
                 </button>

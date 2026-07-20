@@ -1,5 +1,5 @@
 import { NextResponse, NextRequest } from 'next/server';
-import { getSqlServerPool, sql } from '@/lib/db';
+import { getSqlServerPool } from '@/lib/db';
 
 export async function GET(request: NextRequest) {
   try {
@@ -7,37 +7,37 @@ export async function GET(request: NextRequest) {
     const materials = searchParams.get('materials');
     const selectedDate = searchParams.get('selectedDate');
 
-    // 1. เรียกใช้ Pool
+    // 1. ดึง Connection Pool หลักออกมา
     const pool = await getSqlServerPool();
     const dbRequest = pool.request();
 
     let materialCondition = "";
     let dateCondition = "";
 
-    // 2. เงื่อนไข Material 
+    // 2. เงื่อนไข Material (ใช้การวนลูปผูกค่า Parameter แบบ Auto-detect string)
     if (materials && materials.toLowerCase() !== 'all') {
       const materialList = materials.split(',').map(m => m.trim()).filter(m => m !== "");
       if (materialList.length > 0) {
         const paramNames = materialList.map((val, i) => {
-          dbRequest.input(`Material${i}`, sql.VarChar, val);
+          // สั่ง input ส่งไปตรง ๆ ไม่ใส่ sql.VarChar ป้องกัน validation พัง
+          dbRequest.input(`Material${i}`, val);
           return `@Material${i}`;
         });
         materialCondition = ` AND [Material] IN (${paramNames.join(',')})`;
       }
     }
 
-    // 3. เงื่อนไขวันที่ 
-    if (selectedDate) {
-      dbRequest.input('SelectedDate', sql.VarChar, selectedDate);
-      
-      // เปรียบเทียบข้อมูลด้วย CAST เป็น DATE เพื่อตัดเรื่องเวลาทิ้งไปเลย ทำให้เช็กครอบคลุมทั้งวันได้แม่นยำ
+    // 3. เงื่อนไขวันที่
+    if (selectedDate && selectedDate.trim() !== "") {
+      // ส่งค่ายอดฮิต selectedDate ไปเป็น string ตรง ๆ เลย
+      dbRequest.input('SelectedDate', selectedDate.trim());
       dateCondition = ` AND CAST([ImportedAt] AS DATE) = CAST(@SelectedDate AS DATE)`;
     }
 
-    // 4. ประกอบ SQL Statement
+    // 4. ประกอบ SQL Statement แบบสมบูรณ์
     const baseSql = `
       WITH RankedWIP AS (
-          SELECT [Order], [OrderType], [Material],
+          SELECT [Order], [Material],
                  [ProgressPlanning], [StatusSTAR], [OperationQuantity], [ImportedAt],
                  ROW_NUMBER() OVER (
                      PARTITION BY [Order] 
@@ -52,12 +52,12 @@ export async function GET(request: NextRequest) {
           ${materialCondition}
           ${dateCondition}
       )
-      SELECT [Order], [OrderType], [Material],
+      SELECT [Order], [Material],
              [ProgressPlanning], [StatusSTAR], [OperationQuantity], [ImportedAt]
       FROM RankedWIP
-      WHERE RowNum = 1
     `;
 
+    // สั่ง execute คิวรีผ่าน dbRequest ที่ผูก parameter ไว้ครบเรียบร้อยแล้ว
     const result = await dbRequest.query(baseSql);
     return NextResponse.json(result.recordset);
   } catch (error: any) {
