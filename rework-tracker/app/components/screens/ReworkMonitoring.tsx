@@ -132,7 +132,7 @@ export function ReworkMonitoring() {
                   <p style={{ fontSize: 15, fontWeight: 600, color: "#111827", marginBottom: 6 }}>{page.title}</p>
                   <p style={{ fontSize: 13, color: "#6B7280", lineHeight: 1.5 }}>{page.desc}</p>
                 </div>
-                <div style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 12, fontWeight: 500, color: allowed ? page.accent : "#9CA3AF", marginTop: "auto" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 12, fontWeight: 700, color: allowed ? page.accent : "#9CA3AF", marginTop: "auto" }}>
                   {allowed ? "เข้าสู่หน้า" : "ไม่มีสิทธิ์เข้าถึง"}
                   {allowed && (
                     <svg width="14" height="14" viewBox="0 0 14 14" fill="none">

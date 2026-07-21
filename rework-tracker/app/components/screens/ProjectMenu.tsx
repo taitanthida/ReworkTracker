@@ -18,21 +18,21 @@ type Project = {
 
 const PROJECTS: Project[] = [
   {
-    icon: <Wrench size={32} color="#0F6E56" />,
-    iconBg: "#ECFDF5", iconBorder: "#A7F3D0",
+    icon: <Wrench size={32} color="#8DBAED" />,
+    iconBg: "#fff", iconBorder: "#ADCFF1",
     title: "Rework Monitoring",
     desc: "ติดตามงาน rework — ออกใบ, รับงาน/ส่งคืน และดูภาพรวมทุก order",
     route: "/rework",
-    accent: "#0F6E56",
+    accent: "#8DBAED",
     available: true,
   },
   {
-    icon: <ClipboardCheck size={32} color="#7C3AED" />,
-    iconBg: "#F5F3FF", iconBorder: "#DDD6FE",
+    icon: <ClipboardCheck size={32} color="#8DBAED" />,
+    iconBg: "#fff", iconBorder: "#ADCFF1",
     title: "Final QC Monitoring",
     desc: "ติดตามการตรวจสอบคุณภาพขั้นสุดท้าย",
     route: "/final-qc",
-    accent: "#7C3AED",
+    accent: "#8DBAED",
     available: true,
   },
 ]
@@ -93,7 +93,7 @@ export function ProjectMenu() {
               <p style={{ fontSize: 17, fontWeight: 600, color: "#111827", marginBottom: 6 }}>{p.title}</p>
               <p style={{ fontSize: 13, color: "#6B7280", lineHeight: 1.5 }}>{p.desc}</p>
             </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 12, fontWeight: 500, color: p.available ? p.accent : "#9CA3AF", marginTop: "auto" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 12, fontWeight: 700, color: p.available ? p.accent : "#9CA3AF", marginTop: "auto" }}>
               {p.available ? "เข้าใช้งาน" : "เร็ว ๆ นี้ (coming soon)"}
               {p.available && (
                 <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
