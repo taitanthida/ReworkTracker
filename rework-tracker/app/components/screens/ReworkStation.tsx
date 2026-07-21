@@ -483,7 +483,7 @@ function uniqueValues(col: ColKey): string[] {
               {Object.keys(filters).length > 0 && (
                 <button 
                   onClick={() => setFilters({})} 
-                  style={{ fontSize: 12, color: "#8C8985", background: "none", border: "none", cursor: "pointer", fontFamily: "Inter, sans-serif", padding: "0 4px" }}
+                  style={{ fontSize: 12, color: "#000000", background: "none", border: "none", cursor: "pointer", fontFamily: "Inter, sans-serif", padding: "0 4px" }}
                 >
                   Clear all
                 </button>

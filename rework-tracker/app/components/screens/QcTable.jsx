@@ -218,6 +218,29 @@ export default function Table() {
             QC Dashboard
           </h1>
 
+          {/* ── ส่วนควบคุม Filters ด้านขวา ── */}
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            {/* ── ช่องเลือกวันที่ (Date Input) ── */}
+            <div style={{ display: "flex", alignItems: "center" }}>
+              <input
+                type="date"
+                value={draftDate}
+                onChange={(e) => setDraftDate(e.target.value)}
+                style={{
+                  height: 34,
+                  padding: "0 12px",
+                  borderRadius: 8,
+                  border: `0.5px solid ${selectedDate ? C.accent : C.border}`,
+                  fontSize: 12,
+                  outline: "none",
+                  boxSizing: "border-box",
+                  fontFamily: "Inter, sans-serif",
+                  color: C.text,
+                  background: C.white
+                }}
+              />
+            </div>
+
             {/* ── เมนู Material Dropdown ── */}
             <div ref={filterRef} style={{ position: "relative" }}>
               <button onClick={openFilter}
@@ -237,28 +260,6 @@ export default function Table() {
                 <div style={{ position: "absolute", top: "calc(100% + 4px)", right: 0, zIndex: 100,
                   background: "#fff", border: "1px solid #E5E7EB", borderRadius: 8,
                   minWidth: 220, boxShadow: "0 4px 12px rgba(0,0,0,0.08)", overflow: "hidden" }}>
-
-                  <div style={{ padding: "12px 12px 8px", borderBottom: `0.5px solid ${C.border}`, display: "flex", flexDirection: "column", gap: 4 }}>
-                    <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-                      <input
-                        type="date"
-                        value={draftDate}
-                        onChange={(e) => setDraftDate(e.target.value)}
-                        style={{
-                          width: "100%",
-                          height: 30,
-                          padding: "0 8px",
-                          borderRadius: 6,
-                          border: `0.5px solid ${C.border}`,
-                          fontSize: 12,
-                          outline: "none",
-                          boxSizing: "border-box",
-                          fontFamily: "Inter, sans-serif",
-                          color: C.text
-                        }}
-                      />
-                    </div>
-                  </div>
 
                   <div style={{ padding: "10px 12px 8px" }}>
                     <input value={colSearch} onChange={e => setColSearch(e.target.value)} placeholder="Search Material..."
@@ -306,6 +307,7 @@ export default function Table() {
                 </div>
               )}
             </div>
+          </div>
         </div>
 
         {/* custom-scrollbar */}

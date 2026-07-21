@@ -76,20 +76,53 @@ export type OrderInfo = {
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
-export function formatDate(date: Date = new Date()): string {
-  // บังคับแปลงเป็นระบบ en-GB (DD/MM/YY) เสมอ ป้องกันการแปลงสลับฝั่งของหลักวันและปี
-  return date.toLocaleDateString("en-GB", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "2-digit",
-  });
+export function formatDate(dateInput?: string | Date | null): string {
+  // 1. ถ้าเรียก formatDate() เปล่าๆ คืนค่า YYYY-MM-DD ไปเซฟหลังบ้าน
+  if (!dateInput) {
+    const d = new Date();
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${y}-${m}-${day}`;
+  }
+
+  if (dateInput === "-") return "–";
+
+  let day = "";
+  let month = "";
+  let year = "";
+
+  // 2. ดึงจาก DB มาโชว์หน้า UI จัดระเบียบเป็น DD/MM/YY
+  if (typeof dateInput === "string") {
+    if (dateInput.includes("-") && dateInput.length >= 10) {
+      const parts = dateInput.split(" ")[0].split("T")[0].split("-");
+      if (parts.length === 3 && parts[0].length === 4) {
+        year = parts[0].slice(-2);  // กลับมาเอา 2 หลักท้ายเหมือนเดิม (เช่น "26")
+        month = parts[1];
+        day = parts[2];
+        return `${day}/${month}/${year}`;
+      }
+    }
+    
+    const d = new Date(dateInput);
+    if (isNaN(d.getTime())) return "–";
+    day = String(d.getDate()).padStart(2, "0");
+    month = String(d.getMonth() + 1).padStart(2, "0");
+    year = String(d.getFullYear()).slice(-2);
+  } else {
+    const d = dateInput;
+    if (isNaN(d.getTime())) return "–";
+    day = String(d.getDate()).padStart(2, "0");
+    month = String(d.getMonth() + 1).padStart(2, "0");
+    year = String(d.getFullYear()).slice(-2);
+  }
+
+  return `${day}/${month}/${year}`;
 }
 
 export function formatDateFromISO(isoStr: string | null): string {
-  if (!isoStr) return "";
-  const d = new Date(isoStr);
-  if (isNaN(d.getTime())) return "";
-  return formatDate(d);
+  if (!isoStr || isoStr === "-") return "–";
+  return formatDate(isoStr);
 }
 
 // ── Fetch functions ──────────────────

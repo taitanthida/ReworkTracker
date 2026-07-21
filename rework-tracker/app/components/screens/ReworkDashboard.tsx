@@ -517,7 +517,7 @@ export function ReworkDashboard() {
                   }} 
                   style={{ 
                     fontSize: 12, 
-                    color: "#8C8985", 
+                    color: "#000000", 
                     background: "none", 
                     border: "none", 
                     cursor: "pointer", 
