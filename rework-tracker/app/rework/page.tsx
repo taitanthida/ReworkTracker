@@ -1,5 +1,5 @@
 "use client"
-import { HomePage } from "@/app/components/screens/HomePage"
+import { ReworkMonitoring } from "@/app/components/screens/ReworkMonitoring"
 export default function ReworkPage() {
-  return <HomePage />
+  return <ReworkMonitoring />
 }

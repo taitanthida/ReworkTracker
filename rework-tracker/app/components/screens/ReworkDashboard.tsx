@@ -433,10 +433,23 @@ export function ReworkDashboard() {
         </div>
 
        {/* ── All rework orders table ── */}
-        <div ref={tableRef} style={{ background: "#fff", border: "0.5px solid #E5E7EB", borderRadius: 12, overflow: "visible", position: "relative", marginBottom: 16 }}>
+        <div 
+          ref={tableRef} 
+          style={{ 
+            background: "#fff", 
+            border: "0.5px solid #E5E7EB", 
+            borderRadius: 12, 
+            position: "relative", 
+            marginBottom: 16,
+            maxHeight: "calc(80vh - 120px)",
+            display: "flex",
+            flexDirection: "column",
+            overflow: "hidden"
+          }}
+        >
 
           {/* Table top bar */}
-          <div style={{ padding: "14px 20px", borderBottom: "0.5px solid #E5E7EB", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
+          <div style={{ padding: "14px 20px", borderBottom: "0.5px solid #E5E7EB", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, flexWrap: "wrap", flexShrink: 0 }}>
             
             {/* ฝั่งซ้าย: Title */}
             <span style={{ fontSize: 13, fontWeight: 600, color: "#000000" }}>All rework orders</span>
@@ -469,7 +482,7 @@ export function ReworkDashboard() {
               {/* Quick status filters */}
               <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
                 {([
-                  { key: "ALL" as const,         label: "All" },
+                  { key: "ALL" as const,        label: "All" },
                   { key: "ISSUED" as const,      label: "Issued" },
                   { key: "IN_PROGRESS" as const, label: "In Progress" },
                   { key: "RETURNED" as const,    label: "Returned" },
@@ -531,7 +544,7 @@ export function ReworkDashboard() {
           </div>
 
           {/* Column headers with filter dropdowns */}
-          <div style={{ display: "grid", gridTemplateColumns: TABLE_GRID, background: "#ADCFF1", borderBottom: "1px solid #8DBAED" }}>
+          <div style={{ display: "grid", gridTemplateColumns: TABLE_GRID, background: "#ADCFF1", borderBottom: "1px solid #8DBAED", flexShrink: 0, position: "sticky", top: 0, zIndex: 10 }}>
             <div style={{ height: 36 }} />
             {GROUP_COLS.map(col => {
               const active = isFilterActive(col.key);
@@ -564,127 +577,129 @@ export function ReworkDashboard() {
             })}
           </div>
 
-          {/* Table rows */}
-          {loading ? (
-            <div style={{ padding: "24px 20px", fontSize: 13, color: "#9CA3AF", textAlign: "center" }}>Loading...</div>
-          ) : filteredGroups.length === 0 ? (
-            <div style={{ padding: "24px 20px", fontSize: 13, color: "#9CA3AF", textAlign: "center" }}>No orders match the current filters</div>
-          ) : filteredGroups.map((group, gi) => {
-            const isExpanded = expandedOrders.has(group.orderId);
-            return (
-              <div key={group.orderId}>
+          {/* Table rows Area (ส่วนเนื้อหาแถวตาราง + Scrollbar ด้านใน) */}
+          <div style={{ flex: 1, overflowY: "auto", minHeight: 0 }}>
+            {loading ? (
+              <div style={{ padding: "24px 20px", fontSize: 13, color: "#9CA3AF", textAlign: "center" }}>Loading...</div>
+            ) : filteredGroups.length === 0 ? (
+              <div style={{ padding: "24px 20px", fontSize: 13, color: "#9CA3AF", textAlign: "center" }}>No orders match the current filters</div>
+            ) : filteredGroups.map((group, gi) => {
+              const isExpanded = expandedOrders.has(group.orderId);
+              return (
+                <div key={group.orderId}>
 
-                {/* Level 1: Order row */}
-                <div
-                  onClick={() => toggleOrder(group.orderId)}
-                  style={{ display: "grid", gridTemplateColumns: TABLE_GRID, minHeight: 48, alignItems: "center", cursor: "pointer", borderBottom: (!isExpanded && gi < filteredGroups.length - 1) ? "1px solid #E5E7EB" : "none", background: isExpanded ? "#E5E7EB" : "#fff", borderLeft: `3px solid ${isExpanded ? "#8DBAED" : "transparent"}` }}
-                  onMouseEnter={e => { if (!isExpanded) e.currentTarget.style.background = "#F9FAFB"; }}
-                  onMouseLeave={e => { e.currentTarget.style.background = isExpanded ? "#E5E7EB" : "#fff"; }}
-                >
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "center" }}>
-                    {isExpanded ? <ChevronDown size={14} color="#8DBAED" /> : <ChevronRight size={14} color="#8DBAED" />}
+                  {/* Level 1: Order row */}
+                  <div
+                    onClick={() => toggleOrder(group.orderId)}
+                    style={{ display: "grid", gridTemplateColumns: TABLE_GRID, boxSizing: "border-box", minHeight: 48, alignItems: "center", cursor: "pointer", borderBottom: (!isExpanded && gi < filteredGroups.length - 1) ? "1px solid #E5E7EB" : "none", background: isExpanded ? "#E5E7EB" : "#fff", borderLeft: `3px solid ${isExpanded ? "#8DBAED" : "transparent"}` }}
+                    onMouseEnter={e => { if (!isExpanded) e.currentTarget.style.background = "#F9FAFB"; }}
+                    onMouseLeave={e => { e.currentTarget.style.background = isExpanded ? "#E5E7EB" : "#fff"; }}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "center" }}>
+                      {isExpanded ? <ChevronDown size={14} color="#8DBAED" /> : <ChevronRight size={14} color="#8DBAED" />}
+                    </div>
+                    <div style={{ fontSize: 13, color: "#000000", padding: "0 12px", fontWeight: 500 }}>{group.orderId}</div>
+                    <div style={{ fontSize: 13, color: "#000000", padding: "0 12px" }}>{group.materialId ?? "–"}</div>
+                    <div style={{ fontSize: 13, color: "#000000", padding: "0 12px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{group.description ?? "–"}</div>
+                    <div style={{ padding: "0 12px" }}>
+                      <span style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "3px 10px", borderRadius: 999, fontSize: 11, fontWeight: 500, background: STATUS_CHIP[group.latestStatus].bg, color: STATUS_CHIP[group.latestStatus].color }}>
+                        <span style={{ opacity: 0.7 }}>R{group.latestRound}</span>
+                        <span style={{ opacity: 0.4 }}>·</span>
+                        {STATUS_CHIP[group.latestStatus].label}
+                      </span>
+                    </div>
+                    <div style={{ fontSize: 13, color: "#000000", padding: "0 12px" }}>{group.latestDate}</div>
                   </div>
-                  <div style={{ fontSize: 13, color: "#000000", padding: "0 12px", fontWeight: 500 }}>{group.orderId}</div>
-                  <div style={{ fontSize: 13, color: "#000000", padding: "0 12px" }}>{group.materialId ?? "–"}</div>
-                  <div style={{ fontSize: 13, color: "#000000", padding: "0 12px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{group.description ?? "–"}</div>
-                  <div style={{ padding: "0 12px" }}>
-                    <span style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "3px 10px", borderRadius: 999, fontSize: 11, fontWeight: 500, background: STATUS_CHIP[group.latestStatus].bg, color: STATUS_CHIP[group.latestStatus].color }}>
-                      <span style={{ opacity: 0.7 }}>R{group.latestRound}</span>
-                      <span style={{ opacity: 0.4 }}>·</span>
-                      {STATUS_CHIP[group.latestStatus].label}
-                    </span>
-                  </div>
-                  <div style={{ fontSize: 13, color: "#000000", padding: "0 12px" }}>{group.latestDate}</div>
-                </div>
 
-                {/* Level 2: Round rows */}
-                {isExpanded && (
-                  <div style={{ background: "#fff", borderBottom: gi < filteredGroups.length - 1 ? "1px solid #E5E7EB" : "none" }}>
-                    {group.labels.map((lbl, li) => {
-                      const isDetailOpen = expandedLabels.has(lbl.label_id);
-                      return (
-                        <div key={lbl.label_id}>
+                  {/* Level 2: Round rows */}
+                  {isExpanded && (
+                    <div style={{ background: "#fff", borderBottom: gi < filteredGroups.length - 1 ? "1px solid #E5E7EB" : "none" }}>
+                      {group.labels.map((lbl, li) => {
+                        const isDetailOpen = expandedLabels.has(lbl.label_id);
+                        return (
+                          <div key={lbl.label_id}>
 
-                          {/* Round compact row */}
-                          <div
-                            onClick={() => toggleLabel(lbl.label_id)}
-                            style={{ display: "grid", gridTemplateColumns: "52px 180px 160px 1fr 110px 40px", minHeight: 40, alignItems: "center", cursor: "pointer", borderBottom: (!isDetailOpen && li < group.labels.length - 1) ? "1px solid #E5E7EB" : "none", background: isDetailOpen ? "#fff" : "transparent", paddingLeft: 20 }}
-                            onMouseEnter={e => { if (!isDetailOpen) e.currentTarget.style.background = "#F9FAFB"; }}
-                            onMouseLeave={e => { e.currentTarget.style.background = isDetailOpen ? "#fff" : "transparent"; }}
-                          >
-                            <div style={{ display: "flex", alignItems: "center", justifyContent: "center" }}>
-                              {isDetailOpen ? <ChevronDown size={12} color="#8DBAED" /> : <ChevronRight size={12} color="#8DBAED" />}
-                            </div>
-                            <div style={{ fontSize: 12, color: "#000000", fontWeight: 600 }}>{lbl.label_id}</div>
-                            <div>
-                              <span style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "2px 8px", borderRadius: 999, fontSize: 11, fontWeight: 500, background: STATUS_CHIP[lbl.status].bg, color: STATUS_CHIP[lbl.status].color }}>
-                                R{lbl.round_no} · {STATUS_CHIP[lbl.status].label}
-                              </span>
-                            </div>
-                            <div style={{ fontSize: 12, color: "#9CA3AF" }}>
-                              Issued {formatDateFromISO(lbl.issued_at)}{lbl.closed_at ? ` → Closed ${formatDateFromISO(lbl.closed_at)}` : ""}
-                            </div>
-                            <div style={{ fontSize: 12, color: "#9CA3AF" }}>{lbl.input_qty} pcs</div>
-                            <button
-                              onClick={e => { e.stopPropagation(); setPrintLabel(lbl); }}
-                              style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 28, height: 28, background: "none", borderRadius: 6, cursor: "pointer", color: "#8C8985", marginRight: 20 }}
+                            {/* Round compact row */}
+                            <div
+                              onClick={() => toggleLabel(lbl.label_id)}
+                              style={{ display: "grid", gridTemplateColumns: "52px 180px 160px 1fr 110px 40px", minHeight: 40, alignItems: "center", cursor: "pointer", borderBottom: (!isDetailOpen && li < group.labels.length - 1) ? "1px solid #E5E7EB" : "none", background: isDetailOpen ? "#fff" : "transparent", paddingLeft: 20 }}
+                              onMouseEnter={e => { if (!isDetailOpen) e.currentTarget.style.background = "#F9FAFB"; }}
+                              onMouseLeave={e => { e.currentTarget.style.background = isDetailOpen ? "#fff" : "transparent"; }}
                             >
-                              <Printer size={12} />
-                            </button>
-                          </div>
+                              <div style={{ display: "flex", alignItems: "center", justifyContent: "center" }}>
+                                {isDetailOpen ? <ChevronDown size={12} color="#8DBAED" /> : <ChevronRight size={12} color="#8DBAED" />}
+                              </div>
+                              <div style={{ fontSize: 12, color: "#000000", fontWeight: 600 }}>{lbl.label_id}</div>
+                              <div>
+                                <span style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "2px 8px", borderRadius: 999, fontSize: 11, fontWeight: 500, background: STATUS_CHIP[lbl.status].bg, color: STATUS_CHIP[lbl.status].color }}>
+                                  R{lbl.round_no} · {STATUS_CHIP[lbl.status].label}
+                                </span>
+                              </div>
+                              <div style={{ fontSize: 12, color: "#9CA3AF" }}>
+                                Issued {formatDateFromISO(lbl.issued_at)}{lbl.closed_at ? ` → Closed ${formatDateFromISO(lbl.closed_at)}` : ""}
+                              </div>
+                              <div style={{ fontSize: 12, color: "#9CA3AF" }}>{lbl.input_qty} pcs</div>
+                              <button
+                                onClick={e => { e.stopPropagation(); setPrintLabel(lbl); }}
+                                style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 28, height: 28, background: "none", borderRadius: 6, cursor: "pointer", color: "#8C8985", marginRight: 20 }}
+                              >
+                                <Printer size={12} />
+                              </button>
+                            </div>
 
-                          {/* Level 3: Detail card */}
-                          {isDetailOpen && (
-                            <div style={{ padding: "12px 20px 14px 72px", background: "#fff", borderBottom: li < group.labels.length - 1 ? "1px solid #E5E7EB" : "none" }}>
-                              <div style={{ background: "#F9FAFB", border: `0.5px solid #E5E7EB`, borderLeft: `3px solid ${STATUS_CHIP[lbl.status].color}`, borderRadius: 8, padding: "12px 16px" }}>
+                            {/* Level 3: Detail card */}
+                            {isDetailOpen && (
+                              <div style={{ padding: "12px 20px 14px 72px", background: "#fff", borderBottom: li < group.labels.length - 1 ? "1px solid #E5E7EB" : "none" }}>
+                                <div style={{ background: "#F9FAFB", border: `0.5px solid #E5E7EB`, borderLeft: `3px solid ${STATUS_CHIP[lbl.status].color}`, borderRadius: 8, padding: "12px 16px" }}>
 
-                                {/* Date + qty fields */}
-                                <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "8px 20px", marginBottom: (lbl.defect_codes.length > 0 || lbl.remark) ? 12 : 0 }}>
-                                  <CardField label="RW Line"   value={lbl.line_post ?? "–"} />
-                                  <CardField label="Input Qty" value={String(lbl.input_qty)} />
-                                  <CardField label="Good"      value={lbl.result_good_qty !== null ? String(lbl.result_good_qty) : "–"} />
-                                  <CardField label="Bad"       value={lbl.result_bad_qty  !== null ? String(lbl.result_bad_qty)  : "–"} />
-                                </div>
-                                {/* Defect codes */}
-                                {lbl.defect_codes.length > 0 && (
-                                  <div style={{ marginBottom: lbl.remark ? 10 : 0 }}>
-                                    <p style={{ fontSize: 10, color: "#8C8985", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 4 }}>Defect Codes</p>
-                                    <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
-                                      {lbl.defect_codes.map(code => (
-                                        <span key={code} style={{ padding: "2px 8px", borderRadius: 999, background: "#000000", color: "#fff", fontSize: 11, fontWeight: 500 }}>
-                                          {code}{defectOptions.find(d => d.defect_code === code) ? ` · ${defectOptions.find(d => d.defect_code === code)!.description_th}` : ""}
-                                        </span>
-                                      ))}
+                                  {/* Date + qty fields */}
+                                  <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "8px 20px", marginBottom: (lbl.defect_codes.length > 0 || lbl.remark) ? 12 : 0 }}>
+                                    <CardField label="RW Line"   value={lbl.line_post ?? "–"} />
+                                    <CardField label="Input Qty" value={String(lbl.input_qty)} />
+                                    <CardField label="Good"      value={lbl.result_good_qty !== null ? String(lbl.result_good_qty) : "–"} />
+                                    <CardField label="Bad"       value={lbl.result_bad_qty  !== null ? String(lbl.result_bad_qty)  : "–"} />
+                                  </div>
+                                  {/* Defect codes */}
+                                  {lbl.defect_codes.length > 0 && (
+                                    <div style={{ marginBottom: lbl.remark ? 10 : 0 }}>
+                                      <p style={{ fontSize: 10, color: "#8C8985", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 4 }}>Defect Codes</p>
+                                      <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+                                        {lbl.defect_codes.map(code => (
+                                          <span key={code} style={{ padding: "2px 8px", borderRadius: 999, background: "#000000", color: "#fff", fontSize: 11, fontWeight: 500 }}>
+                                            {code}{defectOptions.find(d => d.defect_code === code) ? ` · ${defectOptions.find(d => d.defect_code === code)!.description_th}` : ""}
+                                          </span>
+                                        ))}
+                                      </div>
                                     </div>
+                                  )}
+                                  {/* Remark */}
+                                  {lbl.remark && (
+                                    <div style={{ marginBottom: 8 }}>
+                                      <p style={{ fontSize: 10, color: "#8C8985", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 2 }}>Remark</p>
+                                      <p style={{ fontSize: 12, color: "#000000" }}>{lbl.remark}</p>
+                                    </div>
+                                  )}
+                                  <div style={{ display: "grid", gridTemplateColumns: "1fr", marginBottom: 8 }}>
+                                    <CardField label="QC Name" value={lbl.qc_name ?? "–"} />
                                   </div>
-                                )}
-                                {/* Remark */}
-                                {lbl.remark && (
-                                  <div>
-                                    <p style={{ fontSize: 10, color: "#8C8985", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 2 }}>Remark</p>
-                                    <p style={{ fontSize: 12, color: "#000000" }}>{lbl.remark}</p>
+                                  <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "8px 20px" }}>
+                                    <CardField label="Issued"    value={formatDateFromISO(lbl.issued_at)   || "–"} />
+                                    <CardField label="Returned"  value={formatDateFromISO(lbl.returned_at) || "–"} />
+                                    <CardField label="Received"  value={formatDateFromISO(lbl.received_at) || "–"} />
+                                    <CardField label="Closed"    value={formatDateFromISO(lbl.closed_at)   || "–"} />
                                   </div>
-                                )}
-                                <div style={{ display: "grid", gridTemplateColumns: "1fr", marginBottom: 8 }}>
-                                  <CardField label="QC Name" value={lbl.qc_name ?? "–"} />
-                                </div>
-                                <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "8px 20px", marginBottom: (lbl.defect_codes.length > 0 || lbl.remark) ? 12 : 0 }}>
-                                  <CardField label="Issued"    value={formatDateFromISO(lbl.issued_at)   || "–"} />
-                                  <CardField label="Returned"  value={formatDateFromISO(lbl.returned_at) || "–"} />
-                                  <CardField label="Received"  value={formatDateFromISO(lbl.received_at) || "–"} />
-                                  <CardField label="Closed"    value={formatDateFromISO(lbl.closed_at)   || "–"} />
                                 </div>
                               </div>
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            );
-          })}
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
         </div>
 
         {/* ── Print Preview Modal (reprint from dashboard) ── */}

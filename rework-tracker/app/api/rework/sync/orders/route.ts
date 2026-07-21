@@ -19,7 +19,8 @@ export async function GET() {
           [TargetPackingWK]         AS pack_wk
       FROM [SMTKPIDASHBOARD].[dbo].[WIP_DATA]
       WHERE [OrderType] = 'M001'
-      AND [ProgressPlanning] IN ('FINS6499', 'FINS6697', 'FINS6698', 'FINS6699')`;
+      AND [ProgressPlanning] IN ('FINS6499', 'FINS6697', 'FINS6698', 'FINS6699') 
+      AND CAST([UpdateDate] AS DATE) = CAST(GETDATE() AS DATE)`;
 
     const sqlServerResult = await mssqlPool.request().query(sqlServerQuery);
     const rows = sqlServerResult.recordset;

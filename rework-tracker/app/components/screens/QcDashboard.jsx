@@ -215,7 +215,7 @@ export default function Table() {
       <div className="max-w-full">
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
           <h1 className="text-base font-bold m-0" style={{ fontSize: 20, color: C.text }}>
-            QC Dashboard
+            Dashboard
           </h1>
 
           {/* ── ส่วนควบคุม Filters ด้านขวา ── */}

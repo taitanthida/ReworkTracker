@@ -1,7 +1,7 @@
 "use client"
 import { useRouter } from "next/navigation"
 import { ArrowLeft } from "lucide-react"
-import QcTable from "./QcTable"
+import QcDashboard from "./QcDashboard"
 
 // ── Main component ────────────────────────────────────────────────────────────
 
@@ -23,7 +23,7 @@ export function FinalQcMonitoring() {
       </div>
 
       {/* QC monitoring table */}
-      <QcTable />
+      <QcDashboard />
     </div>
   )
 }

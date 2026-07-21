@@ -18,7 +18,7 @@ const RET_COLS: { key: RetColKey; label: string; width: string; center?: boolean
   { key: "material_id", label: "Material ID", width: "120px"              },
   { key: "description", label: "Description", width: "1fr"                },
   { key: "line_post",   label: "Line Post",   width: "120px", center: true },
-  { key: "input_qty",   label: "Qty",         width: "80px", center: true },
+  { key: "input_qty",   label: "RW Qty",      width: "80px",  center: true },
 ];
 
 const RET_GRID = RET_COLS.map(c => c.width).join(" ") + " 110px 20px";
@@ -451,7 +451,7 @@ export function CreateReworkLabel() {
                   <InfoField label="Progress Planning"    value={info.latestProgPlan ?? "–"} />
                   <InfoField label="QC After P"   value={info.latestQcAfterP ?? "–"} />
                   <InfoField label="Pack WK"      value={info.packWk ?? "–"} />
-                  <InfoField label="Qty"          value={info.total !== null ? String(info.total) : "–"} />
+                  <InfoField label="Open Qty"     value={info.total !== null ? String(info.total) : "–"} />
                   <InfoField label="Latest Label" value={info.latestLabelId ?? "–"} />
                   <InfoField label="Latest Round" value={info.latestRoundNo !== null ? `R${info.latestRoundNo}` : "–"} />
                   <InfoField label="Issued Date"  value={formatDateFromISO(info.latestIssuedAt) || "–"} />
@@ -594,7 +594,7 @@ export function CreateReworkLabel() {
               <SummaryField label="Line Post"    value={panelLinePost || "-"} />
               <SummaryField label="Prog Plan"    value={panelProgPlan || "-"} />
               <SummaryField label="QC After P"   value={panelQcAfterP || "-"} />
-              <SummaryField label="Total"    value={panelQty    !== null ? String(panelQty)    : "-"} />
+              <SummaryField label="Total"        value={panelQty    !== null ? String(panelQty)    : "-"} />
               <SummaryField label="Passed"       value={panelPassed !== null ? String(panelPassed) : "-"} />
               <SummaryField label="Failed - RW"  value={panelFailed !== null ? String(panelFailed) : "-"} color={panelFailed ? "#DC2626" : undefined} />
               {panelDefects.size > 0 && (
