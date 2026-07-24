@@ -18,20 +18,20 @@ type Project = {
 
 const PROJECTS: Project[] = [
   {
-    icon: <Wrench size={32} color="#8DBAED" />,
-    iconBg: "#fff", iconBorder: "#ADCFF1",
-    title: "Rework Monitoring",
-    desc: "ติดตามงาน rework — ออกใบ, รับงาน/ส่งคืน และดูภาพรวมทุก order",
-    route: "/rework",
-    accent: "#8DBAED",
-    available: true,
-  },
-  {
     icon: <ClipboardCheck size={32} color="#8DBAED" />,
     iconBg: "#fff", iconBorder: "#ADCFF1",
     title: "Final QC Monitoring",
     desc: "ติดตามการตรวจสอบคุณภาพขั้นสุดท้าย",
     route: "/final-qc",
+    accent: "#8DBAED",
+    available: true,
+  },
+  {
+    icon: <Wrench size={32} color="#8DBAED" />,
+    iconBg: "#fff", iconBorder: "#ADCFF1",
+    title: "Rework Monitoring",
+    desc: "ติดตามงาน rework — ออกใบ, รับงาน/ส่งคืน และดูภาพรวมทุก order",
+    route: "/rework",
     accent: "#8DBAED",
     available: true,
   },
