@@ -6,8 +6,8 @@ export async function getMasterMaterials() {
 }
 
 // โหลดข้อมูลตาราง ตาม material ที่เลือก
-export async function getOperationQty(materialQuery: string, selectedDate?: string) {
-  let url = `/api/qc/operation-qty?materials=${encodeURIComponent(materialQuery)}`;
+export async function getOpenQty(materialQuery: string, selectedDate?: string) {
+  let url = `/api/qc/open-qty?materials=${encodeURIComponent(materialQuery)}`;
   
   if (selectedDate) {
     url += `&selectedDate=${selectedDate}`;

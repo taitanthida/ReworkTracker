@@ -1,7 +1,7 @@
 "use client";
 import { useState, useMemo, useEffect, useRef } from "react";
 import { ChevronDown } from "lucide-react";
-import { getMasterMaterials, getOperationQty } from "../../../services/qcApi";
+import { getMasterMaterials, getOpenQty } from "../../../services/qcApi";
 
 // ── Colors ────────────────────────────────────────────────────────────────────
 
@@ -26,6 +26,7 @@ const C = {
 
 function unique(arr) { return [...new Set(arr)].sort(); }
 function getGroup(pp) { return pp.startsWith("FINS") ? "final" : "post"; }
+const getTodayString = () => new Date().toISOString().split("T")[0];
 
 // ── CellContent ───────────────────────────────────────────────────────────────
 
@@ -56,13 +57,17 @@ export default function Table() {
   const [loading, setLoading] = useState(false);
   const [masterMaterials, setMasterMaterials] = useState([]); 
 
+  // Helper ดึงวันที่ปัจจุบัน YYYY-MM-DD
+  const getTodayString = () => new Date().toISOString().split("T")[0];
+
   // Filter state 
-  const [isOpen, setIsOpen]     = useState(false); 
-  const [colSearch, setColSearch] = useState("");
-  const [draftMaterial, setDraftMaterial] = useState(new Set());   
+  const [isOpen, setIsOpen]         = useState(false); 
+  const [colSearch, setColSearch]   = useState("");
+  const [tableSearch, setTableSearch] = useState("");
+  const [draftMaterial, setDraftMaterial]   = useState(new Set());   
   const [activeMaterial, setActiveMaterial] = useState(new Set());
-  const [draftDate, setDraftDate] = useState(new Set());
-  const [selectedDate, setSelectedDate] = useState(new Set());   
+  const [draftDate, setDraftDate]       = useState(getTodayString());
+  const [selectedDate, setSelectedDate] = useState(getTodayString()); 
 
   const filterRef = useRef(null);
 
@@ -88,7 +93,7 @@ export default function Table() {
       const isAll = masterMaterials.every(v => activeMaterial.has(v));
       const materialQuery = isAll ? "all" : Array.from(activeMaterial).join(",");
 
-      getOperationQty(materialQuery, selectedDate)
+      getOpenQty(materialQuery, selectedDate)
         .then(setData)
         .catch(err => console.error("Error auto-refreshing table data:", err));
     };
@@ -107,7 +112,15 @@ export default function Table() {
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
-  const filtered = data;
+  // Filter ข้อมูลด้วยคำค้นหา (Order No., Material)
+  const filtered = useMemo(() => {
+    if (!tableSearch.trim()) return data;
+    const term = tableSearch.toLowerCase().trim();
+    return data.filter(d => 
+      (d.Order && d.Order.toString().toLowerCase().includes(term)) ||
+      (d.Material && d.Material.toString().toLowerCase().includes(term))
+    );
+  }, [data, tableSearch]);
 
   function openFilter() {
     if (isOpen) { setIsOpen(false); return; }
@@ -140,7 +153,7 @@ export default function Table() {
       if (!isAll && draftMaterial.size === 0) {
         setData([]);
       } else {
-        const resData = await getOperationQty(materialQuery, draftDate);
+        const resData = await getOpenQty(materialQuery, draftDate);
         setData(resData);
       }
     } catch (err) {
@@ -151,6 +164,15 @@ export default function Table() {
   }
 
   // ── Pivot data ────────────────────────────────────────────────────────────
+  const orderMaterialMap = useMemo(() => {
+    const map = {};
+    filtered.forEach(d => {
+      if (d.Order && d.Material) {
+        map[d.Order] = d.Material;
+      }
+    });
+    return map;
+  }, [filtered]);
 
   const finalLines = useMemo(() => unique(
     filtered.filter(d => d.ProgressPlanning.startsWith("FINS")).map(d => d.ProgressPlanning)
@@ -173,15 +195,23 @@ export default function Table() {
       const colKey = `${getGroup(d.ProgressPlanning)}||${d.ProgressPlanning}`;
       if (!map[d.Order]) map[d.Order] = {};
       if (!map[d.Order][colKey]) map[d.Order][colKey] = { star: 0, blank: 0 };
-      if (d.StatusSTAR === "STAR") map[d.Order][colKey].star  += d.OperationQuantity;
-      else                         map[d.Order][colKey].blank += d.OperationQuantity;
+      if (d.StatusSTAR === "STAR") map[d.Order][colKey].star  += d.OpenQuantity;
+      else                         map[d.Order][colKey].blank += d.OpenQuantity;
     });
     return map;
   }, [filtered]);
 
-  const COL_W          = 90;
-  const stickyLeft     = { position: "sticky", left: 0, zIndex: 2, background: C.headerBg };
-  const stickyLeftBody = (bg) => ({ position: "sticky", left: 0, zIndex: 1, background: bg });
+  // กำหนดความกว้างคอลัมน์ Sticky
+  const ORDER_W = 140;
+  const MATERIAL_W = 120;
+  const COL_W = 140;
+
+  // Sticky Style ช่วยคำนวณตำแหน่ง
+  const stickyLeft1 = { position: "sticky", left: 0, zIndex: 2, background: C.headerBg };
+  const stickyLeft2 = { position: "sticky", left: ORDER_W, zIndex: 2, background: C.headerBg };
+
+  const stickyLeftBody1 = (bg) => ({ position: "sticky", left: 0, zIndex: 1, background: bg });
+  const stickyLeftBody2 = (bg) => ({ position: "sticky", left: ORDER_W, zIndex: 1, background: bg });
 
   return (
     <div className="min-h-screen p-6 font-sans" style={{ background: C.bg }}>
@@ -218,19 +248,21 @@ export default function Table() {
             Dashboard
           </h1>
 
-          {/* ── ส่วนควบคุม Filters ด้านขวา ── */}
+          {/* ── ส่วน Filters ด้านขวา ── */}
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            
+
             {/* ── ช่องเลือกวันที่ (Date Input) ── */}
             <div style={{ display: "flex", alignItems: "center" }}>
               <input
                 type="date"
                 value={draftDate}
-                onChange={(e) => setDraftDate(e.target.value)}
+                readOnly
                 style={{
                   height: 34,
                   padding: "0 12px",
                   borderRadius: 8,
-                  border: `0.5px solid ${selectedDate ? C.accent : C.border}`,
+                  border: `0.5px solid ${C.border}`,
                   fontSize: 12,
                   outline: "none",
                   boxSizing: "border-box",
@@ -245,7 +277,7 @@ export default function Table() {
             <div ref={filterRef} style={{ position: "relative" }}>
               <button onClick={openFilter}
                 style={{ height: 34, padding: "0 12px", display: "flex", alignItems: "center", gap: 6,
-                  background: C.white, border: `0.5px solid ${(activeMaterial && activeMaterial.size > 0) || selectedDate ? C.accent : C.border}`,
+                  background: C.white, border: `0.5px solid ${activeMaterial && activeMaterial.size > 0 ? C.accent : C.border}`,
                   borderRadius: 8, fontSize: 12, color: C.text, cursor: "pointer", fontFamily: "Inter, sans-serif" }}>
                 <span>Material</span>
                 {activeMaterial && activeMaterial.size > 0 && (
@@ -307,6 +339,28 @@ export default function Table() {
                 </div>
               )}
             </div>
+            {/* ── ช่อง Search Box (Order No. / Material) ── 
+            <div style={{ display: "flex", alignItems: "center" }}>
+              <input
+                type="text"
+                placeholder="Search Order, Material..."
+                value={tableSearch}
+                onChange={(e) => setTableSearch(e.target.value)}
+                style={{
+                  height: 34,
+                  padding: "0 12px",
+                  borderRadius: 8,
+                  border: `0.5px solid ${C.border}`,
+                  fontSize: 12,
+                  outline: "none",
+                  boxSizing: "border-box",
+                  fontFamily: "Inter, sans-serif",
+                  color: C.text,
+                  background: C.white,
+                  width: 200
+                }}
+              />
+            </div>*/}
           </div>
         </div>
 
@@ -322,15 +376,16 @@ export default function Table() {
 
           <table style={{ fontSize: 12, borderCollapse: "separate", borderSpacing: 0, fontFamily: "Inter, sans-serif", tableLayout: "fixed", width: "100%", minWidth: "max-content"}}>
             <colgroup>
-              <col style={{ width: 160 }} />
+              <col style={{ width: ORDER_W }} />
+              <col style={{ width: MATERIAL_W }} />
               {colKeys.map(c => <col key={c.key} style={{ width: COL_W }} />)}
             </colgroup>
             <thead style={{ position: "sticky", top: 0, zIndex: 10, transform: "translateZ(0)" }}>
               <tr style={{ background: C.headerBg }}>
                 <th rowSpan={2} className="text-center px-3 whitespace-nowrap"
                   style={{ 
-                    ...stickyLeft, 
-                    width: 160, 
+                    ...stickyLeft1, 
+                    width: ORDER_W, 
                     height: 36, 
                     fontSize: 12, 
                     fontWeight: 700, 
@@ -343,7 +398,25 @@ export default function Table() {
                     background: C.headerBg, 
                     zIndex: 12
                   }}>
-                  Order No.
+                  Order
+                </th>
+                <th rowSpan={2} className="text-center px-3 whitespace-nowrap"
+                  style={{ 
+                    ...stickyLeft2, 
+                    width: MATERIAL_W, 
+                    height: 36, 
+                    fontSize: 12, 
+                    fontWeight: 700, 
+                    letterSpacing: "0.07em", 
+                    textTransform: "uppercase", 
+                    borderRight: `0.5px solid ${C.headerBorder}`,
+                    borderBottom: `0.5px solid ${C.headerBorder}`,
+                    color: C.text, 
+                    verticalAlign: "middle",
+                    background: C.headerBg,
+                    zIndex: 12
+                  }}>
+                  Material
                 </th>
                 {finalLines.length > 0 && (
                   <th colSpan={finalLines.length} className="text-center px-3"
@@ -381,7 +454,7 @@ export default function Table() {
             <tbody>
               {orders.length === 0 ? (
                 <tr>
-                  <td colSpan={colKeys.length + 1} className="text-center" style={{ height: 100, color: C.textMuted, fontStyle: "italic" }}>
+                  <td colSpan={colKeys.length + 2} className="text-center" style={{ height: 100, color: C.textMuted, fontStyle: "italic" }}>
                     Please select Material from the filter above and click Apply to load data.
                   </td>
                 </tr>
@@ -392,18 +465,33 @@ export default function Table() {
                     <tr key={order} className="qc-row" style={{ background: rowBg }}>
                       <td className="px-3 whitespace-nowrap"
                         style={{ 
-                          ...stickyLeftBody(rowBg), 
+                          ...stickyLeftBody1(rowBg), 
                           height: 48, 
                           fontWeight: 600, 
                           color: C.text, 
                           borderRight: `0.5px solid ${C.border}`, 
                           borderBottom: `0.5px solid ${C.border}`, 
                           fontSize: 12, 
-                          width: 160, 
-                          maxWidth: 160, 
+                          width: ORDER_W, 
+                          maxWidth: ORDER_W, 
                           overflow: "hidden" 
                         }}>
                         {order}
+                      </td>
+                      <td className="px-3 whitespace-nowrap"
+                        style={{ 
+                          ...stickyLeftBody2(rowBg), 
+                          height: 48, 
+                          fontWeight: 600, 
+                          color: C.text, 
+                          borderRight: `0.5px solid ${C.border}`, 
+                          borderBottom: `0.5px solid ${C.border}`, 
+                          fontSize: 12, 
+                          width: MATERIAL_W, 
+                          maxWidth: MATERIAL_W, 
+                          overflow: "hidden" 
+                        }}>
+                        {orderMaterialMap[order] || "—"}
                       </td>
                       {colKeys.map(c => (
                         <td key={c.key} className="px-3 text-right"

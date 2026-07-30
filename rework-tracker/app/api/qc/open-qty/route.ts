@@ -38,7 +38,7 @@ export async function GET(request: NextRequest) {
     const baseSql = `
       WITH RankedWIP AS (
           SELECT [Order], [Material],
-                 [ProgressPlanning], [StatusSTAR], [OperationQuantity], [ImportedAt],
+                 [ProgressPlanning], [StatusSTAR], [OpenQuantity], [ImportedAt],
                  ROW_NUMBER() OVER (
                      PARTITION BY [Order] 
                      ORDER BY [ImportedAt] DESC, (SELECT NULL)
@@ -53,7 +53,7 @@ export async function GET(request: NextRequest) {
           ${dateCondition}
       )
       SELECT [Order], [Material],
-             [ProgressPlanning], [StatusSTAR], [OperationQuantity], [ImportedAt]
+             [ProgressPlanning], [StatusSTAR], [OpenQuantity], [ImportedAt]
       FROM RankedWIP
     `;
 
@@ -61,7 +61,7 @@ export async function GET(request: NextRequest) {
     const result = await dbRequest.query(baseSql);
     return NextResponse.json(result.recordset);
   } catch (error: any) {
-    console.error('❌ Database error in operation-qty API:', error);
+    console.error('❌ Database error in open-qty API:', error);
     return NextResponse.json(
       { error: error.message || 'Internal Server Error' }, 
       { status: 500 }
