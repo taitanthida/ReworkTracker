@@ -684,8 +684,8 @@ export function ReworkDashboard() {
                                   </div>
                                   <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "8px 20px" }}>
                                     <CardField label="Issued"    value={formatDateFromISO(lbl.issued_at)   || "–"} />
-                                    <CardField label="Returned"  value={formatDateFromISO(lbl.returned_at) || "–"} />
                                     <CardField label="Received"  value={formatDateFromISO(lbl.received_at) || "–"} />
+                                    <CardField label="Returned"  value={formatDateFromISO(lbl.returned_at) || "–"} />
                                     <CardField label="Closed"    value={formatDateFromISO(lbl.closed_at)   || "–"} />
                                   </div>
                                 </div>
